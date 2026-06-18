@@ -38,10 +38,10 @@ class ForestScene : VantageScene {
         drawForestFloor(canvas, palette, params)
         drawFerns(canvas, palette, params)
 
-        if (params.season == Season.AUTUMN) drawFallingLeaves(canvas, palette, params)
-        if (params.season == Season.SUMMER && params.timeOfDay > 20f || params.timeOfDay < 5f)
+        if (params.season == Season.AUTUMN && params.intensity > 0.05f) drawFallingLeaves(canvas, palette, params)
+        if (params.season == Season.SUMMER && (params.timeOfDay < 6f || params.timeOfDay > 19f) && params.intensity > 0.1f)
             drawFireflies(canvas, params)
-        if (params.timeOfDay in 5f..7f || params.timeOfDay in 18f..20f)
+        if (params.weather == WeatherType.FOG || params.timeOfDay < 8f || params.timeOfDay > 18.5f || params.season == Season.WINTER)
             drawFloorMist(canvas, params)
     }
 
@@ -49,28 +49,37 @@ class ForestScene : VantageScene {
         val farTree: Int, val midTree: Int, val nearTree: Int,
         val canopy: Int, val canopyLight: Int, val trunk: Int,
         val floor: Int, val fern: Int, val leaf: Int,
+        val dirt: Int, val moss: Int, val accents: List<Int>,
     )
 
     private fun seasonPalette(season: Season) = when (season) {
         Season.SPRING -> ForestPalette(
-            0xFF4A7A48.toInt(), 0xFF3D6B3A.toInt(), 0xFF2D5A2A.toInt(),
-            0xFF5C9A50.toInt(), 0xFF7AB868.toInt(), 0xFF5A4A3A.toInt(),
-            0xFF3A5A2A.toInt(), 0xFF4A8A3A.toInt(), 0xFF6ABB55.toInt(),
+            farTree = 0xFF6a8458.toInt(), midTree = 0xFF2e4a2e.toInt(), nearTree = 0xFF152915.toInt(),
+            canopy = 0xFF2e4a2e.toInt(), canopyLight = 0xFF9bb87a.toInt(), trunk = 0xFF2a2418.toInt(),
+            floor = 0xFF3a4628.toInt(), fern = 0xFF3e5a30.toInt(), leaf = 0xFF9bb87a.toInt(),
+            dirt = 0xFF4a3826.toInt(), moss = 0xFF7ea25a.toInt(),
+            accents = listOf(0xFF9bb87a.toInt(), 0xFFc8d090.toInt(), 0xFFe8d8a0.toInt()),
         )
         Season.SUMMER -> ForestPalette(
-            0xFF3A6A38.toInt(), 0xFF2D5A2A.toInt(), 0xFF1E4A1C.toInt(),
-            0xFF4A8A40.toInt(), 0xFF5CA850.toInt(), 0xFF4A3A2A.toInt(),
-            0xFF2A4A1A.toInt(), 0xFF3A7A2A.toInt(), 0xFF4A9A38.toInt(),
+            farTree = 0xFF365432.toInt(), midTree = 0xFF1f3a1d.toInt(), nearTree = 0xFF0c1c0c.toInt(),
+            canopy = 0xFF1f3a1d.toInt(), canopyLight = 0xFF3a5e2e.toInt(), trunk = 0xFF2a2418.toInt(),
+            floor = 0xFF243a1e.toInt(), fern = 0xFF1f3a1d.toInt(), leaf = 0xFF3a5e2e.toInt(),
+            dirt = 0xFF3a2e1e.toInt(), moss = 0xFF3a5a2a.toInt(),
+            accents = listOf(0xFF3a5e2e.toInt(), 0xFF5a7838.toInt(), 0xFF7a9248.toInt()),
         )
         Season.AUTUMN -> ForestPalette(
-            0xFF8A6A38.toInt(), 0xFF9A5A28.toInt(), 0xFF7A4A20.toInt(),
-            0xFFC88A40.toInt(), 0xFFE8A848.toInt(), 0xFF5A4030.toInt(),
-            0xFF6A5030.toInt(), 0xFF9A7A40.toInt(), 0xFFD87838.toInt(),
+            farTree = 0xFF7a5232.toInt(), midTree = 0xFF3e2818.toInt(), nearTree = 0xFF1a1208.toInt(),
+            canopy = 0xFF3e2818.toInt(), canopyLight = 0xFFC87458.toInt(), trunk = 0xFF2a2418.toInt(),
+            floor = 0xFF352818.toInt(), fern = 0xFF5a3a22.toInt(), leaf = 0xFFC87458.toInt(),
+            dirt = 0xFF3a2a18.toInt(), moss = 0xFF5a4828.toInt(),
+            accents = listOf(0xFFC87458.toInt(), 0xFFD9B382.toInt(), 0xFFA85838.toInt(), 0xFFE0A878.toInt()),
         )
         Season.WINTER -> ForestPalette(
-            0xFF5A6A68.toInt(), 0xFF4A5A58.toInt(), 0xFF3A4A48.toInt(),
-            0xFF6A7A70.toInt(), 0xFF7A8A80.toInt(), 0xFF5A5048.toInt(),
-            0xFF4A5A50.toInt(), 0xFF5A6A58.toInt(), 0xFF6A7A68.toInt(),
+            farTree = 0xFF5a5a58.toInt(), midTree = 0xFF36363a.toInt(), nearTree = 0xFF16181a.toInt(),
+            canopy = 0xFF36363a.toInt(), canopyLight = 0xFFe8e4d8.toInt(), trunk = 0xFF2a2418.toInt(),
+            floor = 0xFFbdb8aa.toInt(), fern = 0xFF4a5048.toInt(), leaf = 0xFFe8e4d8.toInt(),
+            dirt = 0xFF5a5650.toInt(), moss = 0xFF787268.toInt(),
+            accents = listOf(0xFFe8e4d8.toInt(), 0xFFc8c4b8.toInt(), 0xFFa8a498.toInt()),
         )
     }
 

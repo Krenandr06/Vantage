@@ -34,7 +34,10 @@ class EclipseScene : VantageScene {
         drawStars(canvas, w, h, if (totality) 0.8f else 0f, params.elapsedMs)
 
         if (totality) {
-            drawCorona(canvas, params)
+            // Corona rays only during totality AND intensity > 0.05
+            if (params.intensity > 0.05f) {
+                drawCorona(canvas, params)
+            }
             drawTotalEclipse(canvas)
         }
 
@@ -135,14 +138,44 @@ class EclipseScene : VantageScene {
     }
 
     private fun drawHorizonGlow(canvas: Canvas, totality: Boolean) {
-        val glowColor = if (totality) 0xFFC87458.toInt() else 0xFFE8A868.toInt()
-        horizonPaint.shader = LinearGradient(
-            0f, h * 0.7f, 0f, h * 0.85f,
-            0x00000000, glowColor and 0x40FFFFFF,
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawRect(0f, h * 0.7f, w.toFloat(), h * 0.85f, horizonPaint)
-        horizonPaint.shader = null
+        if (totality) {
+            // 360-degree sunset glow at horizon during totality
+            // Warm glow band spanning the full horizon
+            val glowColor = 0xFFC87458.toInt()
+            horizonPaint.shader = LinearGradient(
+                0f, h * 0.65f, 0f, h * 0.85f,
+                intArrayOf(0x00000000, glowColor and 0x50FFFFFF, glowColor and 0x38FFFFFF, 0x00000000),
+                floatArrayOf(0f, 0.4f, 0.7f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawRect(0f, h * 0.65f, w.toFloat(), h * 0.85f, horizonPaint)
+            horizonPaint.shader = null
+
+            // Additional warm tint at edges for 360-degree effect
+            val edgeGlow = 0xFFD08060.toInt()
+            horizonPaint.shader = LinearGradient(
+                0f, 0f, w * 0.15f, 0f,
+                edgeGlow and 0x28FFFFFF, 0x00000000,
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawRect(0f, h * 0.68f, w * 0.15f, h * 0.82f, horizonPaint)
+            horizonPaint.shader = LinearGradient(
+                w.toFloat(), 0f, w * 0.85f, 0f,
+                edgeGlow and 0x28FFFFFF, 0x00000000,
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawRect(w * 0.85f, h * 0.68f, w.toFloat(), h * 0.82f, horizonPaint)
+            horizonPaint.shader = null
+        } else {
+            val glowColor = 0xFFE8A868.toInt()
+            horizonPaint.shader = LinearGradient(
+                0f, h * 0.7f, 0f, h * 0.85f,
+                0x00000000, glowColor and 0x40FFFFFF,
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawRect(0f, h * 0.7f, w.toFloat(), h * 0.85f, horizonPaint)
+            horizonPaint.shader = null
+        }
     }
 
     private fun drawDistantMountains(canvas: Canvas) {

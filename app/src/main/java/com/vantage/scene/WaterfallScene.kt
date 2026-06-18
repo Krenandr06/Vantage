@@ -39,19 +39,28 @@ class WaterfallScene : VantageScene {
     }
 
     private fun drawTopTrees(canvas: Canvas, params: SceneParams) {
-        val green = when (params.season) {
-            Season.SPRING -> 0xFF4A8A40.toInt()
-            Season.SUMMER -> 0xFF3A7A30.toInt()
-            Season.AUTUMN -> 0xFF9A7A30.toInt()
-            Season.WINTER -> 0xFF5A6A50.toInt()
+        // Canopy colors change by season per design spec
+        val canopyBright: Int
+        val canopyMid: Int
+        val canopyDark: Int
+        when (params.season) {
+            Season.SPRING -> { canopyBright = 0xFF9BC06E.toInt(); canopyMid = 0xFF5A8A3A.toInt(); canopyDark = 0xFF2A4A1A.toInt() }
+            Season.SUMMER -> { canopyBright = 0xFF88A648.toInt(); canopyMid = 0xFF436A26.toInt(); canopyDark = 0xFF1F3A14.toInt() }
+            Season.AUTUMN -> { canopyBright = 0xFFD9A058.toInt(); canopyMid = 0xFFA05A24.toInt(); canopyDark = 0xFF4A2810.toInt() }
+            Season.WINTER -> { canopyBright = 0xFFA8A89A.toInt(); canopyMid = 0xFF5A5A52.toInt(); canopyDark = 0xFF2A2A26.toInt() }
         }
-        treePaint.color = green
         val rng = PRNG(100)
         for (i in 0 until 10) {
             val x = rng.next() * w
             val r = 15f + rng.next() * 25f
             val y = h * 0.08f + rng.next() * h * 0.06f
-            canvas.drawCircle(x, y, r, treePaint)
+            // Layer: dark base, mid body, bright highlight
+            treePaint.color = canopyDark
+            canvas.drawCircle(x, y + 2f, r, treePaint)
+            treePaint.color = canopyMid
+            canvas.drawCircle(x, y, r * 0.9f, treePaint)
+            treePaint.color = canopyBright
+            canvas.drawCircle(x - r * 0.15f, y - r * 0.15f, r * 0.5f, treePaint)
         }
     }
 
@@ -82,14 +91,23 @@ class WaterfallScene : VantageScene {
     }
 
     private fun drawMoss(canvas: Canvas, params: SceneParams) {
-        mossPaint.color = 0xFF4A7A3A.toInt()
+        // Vibrant moss colors per design spec
+        val mossBright = 0xFF8AA84A.toInt()
+        val mossMid = 0xFF5A7E30.toInt()
+        val mossDeep = 0xFF3A5A1E.toInt()
         val rng = PRNG(200)
         // Left side moss
         for (i in 0 until 8) {
             val x = w * 0.3f + rng.next() * w * 0.08f
             val y = h * 0.15f + rng.next() * h * 0.35f
+            mossPaint.color = mossDeep
+            canvas.drawOval(x - 7f, y - 3.5f, x + 7f, y + 3.5f, mossPaint)
+            mossPaint.color = mossMid
             canvas.drawOval(x - 6f, y - 3f, x + 6f, y + 3f, mossPaint)
+            mossPaint.color = mossBright
+            canvas.drawOval(x - 3f, y - 2f, x + 3f, y + 1f, mossPaint)
             // Drippy tendrils
+            mossPaint.color = mossMid
             mossPaint.strokeWidth = 1.5f
             mossPaint.style = Paint.Style.STROKE
             val tendrilLen = 8f + rng.next() * 12f
@@ -100,7 +118,13 @@ class WaterfallScene : VantageScene {
         for (i in 0 until 8) {
             val x = w * 0.62f + rng.next() * w * 0.08f
             val y = h * 0.15f + rng.next() * h * 0.35f
+            mossPaint.color = mossDeep
+            canvas.drawOval(x - 7f, y - 3.5f, x + 7f, y + 3.5f, mossPaint)
+            mossPaint.color = mossMid
             canvas.drawOval(x - 6f, y - 3f, x + 6f, y + 3f, mossPaint)
+            mossPaint.color = mossBright
+            canvas.drawOval(x - 3f, y - 2f, x + 3f, y + 1f, mossPaint)
+            mossPaint.color = mossMid
             mossPaint.strokeWidth = 1.5f
             mossPaint.style = Paint.Style.STROKE
             val tendrilLen = 8f + rng.next() * 12f
@@ -184,7 +208,8 @@ class WaterfallScene : VantageScene {
     private fun drawSpray(canvas: Canvas, params: SceneParams) {
         sprayPaint.color = 0xFFFFFFFF.toInt()
         val rng = PRNG(500)
-        for (i in 0 until 20) {
+        val sprayCount = (12 + (params.intensity * 18).toInt()).coerceIn(12, 30)
+        for (i in 0 until sprayCount) {
             val baseX = w * 0.5f + (rng.next() - 0.5f) * w * 0.2f
             val baseY = h * 0.52f
             val speed = 30f + rng.next() * 50f
@@ -249,8 +274,8 @@ class WaterfallScene : VantageScene {
         }
         fernPaint.style = Paint.Style.FILL
 
-        // Leaf drift in autumn
-        if (params.season == Season.AUTUMN) {
+        // Leaf drift in autumn only when wind intensity > 0.05
+        if (params.season == Season.AUTUMN && params.intensity > 0.05f) {
             fernPaint.color = 0xFFD87838.toInt()
             val lrng = PRNG(700)
             for (i in 0 until 8) {

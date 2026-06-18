@@ -130,12 +130,27 @@ class VantageWallpaperService : WallpaperService() {
             val canvas = try { holder.lockCanvas() } catch (_: Exception) { null }
             if (canvas != null) {
                 try {
+                    val resolvedTime = if (prefs.useAutoTime) currentTimeOfDay() else prefs.timeOverride
+                    val resolvedSeason = when (prefs.seasonOverride) {
+                        "spring" -> Season.SPRING
+                        "summer" -> Season.SUMMER
+                        "autumn" -> Season.AUTUMN
+                        "winter" -> Season.WINTER
+                        else -> currentSeason()
+                    }
+                    val resolvedWeather = if (prefs.weatherEnabled) when (prefs.weatherType) {
+                        "rain" -> WeatherType.RAIN
+                        "snow" -> WeatherType.SNOW
+                        "fog" -> WeatherType.FOG
+                        "cloudy" -> WeatherType.CLOUDY
+                        else -> WeatherType.CLEAR
+                    } else WeatherType.CLEAR
                     val params = SceneParams(
                         width = w,
                         height = h,
-                        timeOfDay = currentTimeOfDay(),
-                        season = currentSeason(),
-                        weather = if (prefs.weatherEnabled) WeatherType.CLEAR else WeatherType.CLEAR,
+                        timeOfDay = resolvedTime,
+                        season = resolvedSeason,
+                        weather = resolvedWeather,
                         intensity = prefs.intensity,
                         deltaMs = deltaMs,
                         elapsedMs = elapsedMs,

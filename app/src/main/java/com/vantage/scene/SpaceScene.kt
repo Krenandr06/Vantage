@@ -20,6 +20,7 @@ class SpaceScene : VantageScene {
     private val path = Path()
     private var w = 0
     private var h = 0
+    private var planetDrift = 0f
 
     override fun init(width: Int, height: Int) { w = width; h = height }
 
@@ -94,6 +95,9 @@ class SpaceScene : VantageScene {
     }
 
     private fun drawAurora(canvas: Canvas, params: SceneParams) {
+        // Aurora ribbons only visible when intensity > 0.35
+        if (params.intensity <= 0.35f) return
+
         auroraPaint.style = Paint.Style.STROKE
         auroraPaint.strokeWidth = 3f
         val colors = intArrayOf(0xFF30A060.toInt(), 0xFF2080A0.toInt(), 0xFF4060C0.toInt())
@@ -116,6 +120,9 @@ class SpaceScene : VantageScene {
     }
 
     private fun drawComet(canvas: Canvas, params: SceneParams) {
+        // Comets only visible when intensity > 0.6
+        if (params.intensity <= 0.6f) return
+
         val cycle = 30000L
         val t = (params.elapsedMs % cycle).toFloat() / cycle
         if (t > 0.15f) return
@@ -155,7 +162,9 @@ class SpaceScene : VantageScene {
     }
 
     private fun drawPlanet(canvas: Canvas, params: SceneParams) {
-        val cx = w * 0.5f
+        // Planet slowly rotates (background position drifts)
+        planetDrift = (Math.sin(params.elapsedMs / 60000.0) * w * 0.02f).toFloat()
+        val cx = w * 0.5f + planetDrift
         val cy = h * 0.55f
         val r = w * 0.22f
 
@@ -184,6 +193,7 @@ class SpaceScene : VantageScene {
     }
 
     private fun drawRings(canvas: Canvas, params: SceneParams) {
+        val cx = w * 0.5f + planetDrift
         ringPaint.style = Paint.Style.STROKE
         ringPaint.color = 0xFFA0A0B0.toInt()
         for (i in 0 until 4) {
@@ -192,8 +202,8 @@ class SpaceScene : VantageScene {
             ringPaint.alpha = 60 - i * 10
             ringPaint.strokeWidth = 3f - i * 0.5f
             canvas.drawOval(
-                w * 0.5f - rx, h * 0.55f - ry,
-                w * 0.5f + rx, h * 0.55f + ry,
+                cx - rx, h * 0.55f - ry,
+                cx + rx, h * 0.55f + ry,
                 ringPaint,
             )
         }
@@ -202,14 +212,15 @@ class SpaceScene : VantageScene {
     }
 
     private fun drawAtmosphereHalo(canvas: Canvas) {
+        val cx = w * 0.5f + planetDrift
         haloPaint.color = 0xFF6090C0.toInt()
         haloPaint.alpha = 20
         haloPaint.style = Paint.Style.STROKE
         haloPaint.strokeWidth = 8f
-        canvas.drawCircle(w * 0.5f, h * 0.55f, w * 0.23f, haloPaint)
+        canvas.drawCircle(cx, h * 0.55f, w * 0.23f, haloPaint)
         haloPaint.alpha = 10
         haloPaint.strokeWidth = 16f
-        canvas.drawCircle(w * 0.5f, h * 0.55f, w * 0.25f, haloPaint)
+        canvas.drawCircle(cx, h * 0.55f, w * 0.25f, haloPaint)
         haloPaint.style = Paint.Style.FILL
         haloPaint.alpha = 255
     }

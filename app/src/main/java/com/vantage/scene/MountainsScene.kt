@@ -12,6 +12,7 @@ class MountainsScene : VantageScene {
     private val lakePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val fgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val mistPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
     private var w = 0
     private var h = 0
@@ -25,15 +26,16 @@ class MountainsScene : VantageScene {
         drawSun(canvas, w, h, sky)
         drawMoon(canvas, w, h, sky)
 
-        drawFarRidge(canvas, sky)
+        drawFarRidge(canvas, sky, params)
         drawMidRidge(canvas, params, sky)
         drawMainRidge(canvas, params)
         drawNearRidge(canvas, params)
         drawLake(canvas, sky, params)
+        drawValleyMist(canvas, params)
         drawForeground(canvas, params)
     }
 
-    private fun drawFarRidge(canvas: Canvas, sky: SkyState) {
+    private fun drawFarRidge(canvas: Canvas, sky: SkyState, params: SceneParams) {
         ridgePaint.color = lerpColor(0xFF6A7A9A.toInt(), sky.midColor, 0.4f)
         path.reset()
         path.moveTo(0f, h * 0.35f)
@@ -49,6 +51,29 @@ class MountainsScene : VantageScene {
         path.lineTo(0f, h.toFloat())
         path.close()
         canvas.drawPath(path, ridgePaint)
+
+        // Snow caps on far ridge
+        val snowAmount = when (params.season) {
+            Season.WINTER -> 0.05f
+            Season.AUTUMN, Season.SPRING -> 0.03f
+            Season.SUMMER -> 0.01f
+        }
+        snowPaint.color = 0xFFE8E4E0.toInt()
+        snowPaint.alpha = 160
+        val rng2 = PRNG(111)
+        x = 0f
+        while (x <= w) {
+            val peakH = h * (0.28f + rng2.next() * 0.08f)
+            val capH = h * snowAmount
+            path.reset()
+            path.moveTo(x - w * 0.025f, peakH + capH)
+            path.lineTo(x, peakH)
+            path.lineTo(x + w * 0.025f, peakH + capH)
+            path.close()
+            canvas.drawPath(path, snowPaint)
+            x += w * 0.08f + rng2.next() * w * 0.06f
+        }
+        snowPaint.alpha = 255
     }
 
     private fun drawMidRidge(canvas: Canvas, params: SceneParams, sky: SkyState) {
@@ -169,21 +194,40 @@ class MountainsScene : VantageScene {
         lakePaint.alpha = 200
         canvas.drawRect(0f, lakeTop, w.toFloat(), lakeBot, lakePaint)
 
-        // Ripples
+        // Ripples - sway amplitude scales with intensity
         ripplePaint.color = 0xFFFFFFFF.toInt()
         ripplePaint.style = Paint.Style.STROKE
         ripplePaint.strokeWidth = 1f
         val rng = PRNG(555)
+        val rippleIntensity = 0.3f + params.intensity * 0.7f
         for (i in 0 until 8) {
             val rx = rng.next() * w
             val ry = lakeTop + rng.next() * (lakeBot - lakeTop)
             val phase = (params.elapsedMs / 2000.0 + rng.next() * 6.28).toFloat()
-            val rippleW = 10f + (Math.sin(phase.toDouble()) * 8).toFloat()
-            ripplePaint.alpha = (30 + (Math.sin(phase.toDouble()) * 20).toInt()).coerceIn(0, 255)
+            val rippleW = (10f + (Math.sin(phase.toDouble()) * 8).toFloat()) * rippleIntensity
+            ripplePaint.alpha = ((30 + (Math.sin(phase.toDouble()) * 20).toInt()) * rippleIntensity).toInt().coerceIn(0, 255)
             canvas.drawLine(rx - rippleW, ry, rx + rippleW, ry, ripplePaint)
         }
         ripplePaint.style = Paint.Style.FILL
         ripplePaint.alpha = 255
+    }
+
+    private fun drawValleyMist(canvas: Canvas, params: SceneParams) {
+        // Mist at dawn/dusk or when weather is fog
+        val isDawnDusk = params.timeOfDay in 5.5f..7.5f || params.timeOfDay in 17f..19f
+        val isFog = params.weather == WeatherType.FOG
+        if (!isDawnDusk && !isFog) return
+
+        val mistAlpha = if (isFog) 50 else 30
+        mistPaint.color = 0xFFD8D4D0.toInt()
+        val rng = PRNG(777)
+        for (i in 0 until 6) {
+            val mx = rng.next() * w + (Math.sin(params.elapsedMs / 5000.0 + i) * 15).toFloat()
+            val my = h * 0.56f + rng.next() * h * 0.08f
+            mistPaint.alpha = (mistAlpha + (rng.next() * 15).toInt()).coerceIn(0, 255)
+            canvas.drawOval(mx - 60f, my - 12f, mx + 60f, my + 12f, mistPaint)
+        }
+        mistPaint.alpha = 255
     }
 
     private fun drawForeground(canvas: Canvas, params: SceneParams) {

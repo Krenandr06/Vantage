@@ -13,6 +13,7 @@ class RiverScene : VantageScene {
     private val lilyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val reedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bankPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val mistPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
     private var w = 0
     private var h = 0
@@ -32,6 +33,7 @@ class RiverScene : VantageScene {
         drawWater(canvas, sky, params)
         drawLilyPads(canvas, params)
         drawReeds(canvas, params)
+        drawWaterMist(canvas, params)
         drawForegroundBank(canvas, params)
     }
 
@@ -93,13 +95,16 @@ class RiverScene : VantageScene {
         path.close()
         canvas.drawPath(path, treePaint)
 
-        // Dock
-        bankPaint.color = 0xFF6A5A4A.toInt()
-        val dockX = w * 0.7f
-        val dockY = h * 0.48f
-        canvas.drawRect(dockX, dockY, dockX + w * 0.08f, dockY + 4f, bankPaint)
-        canvas.drawRect(dockX, dockY, dockX + 3f, dockY + 12f, bankPaint)
-        canvas.drawRect(dockX + w * 0.08f - 3f, dockY, dockX + w * 0.08f, dockY + 12f, bankPaint)
+        // Dock - visible in non-winter, daytime only
+        val isDaytime = params.timeOfDay in 6.5f..18f
+        if (params.season != Season.WINTER && isDaytime) {
+            bankPaint.color = 0xFF6A5A4A.toInt()
+            val dockX = w * 0.7f
+            val dockY = h * 0.48f
+            canvas.drawRect(dockX, dockY, dockX + w * 0.08f, dockY + 4f, bankPaint)
+            canvas.drawRect(dockX, dockY, dockX + 3f, dockY + 12f, bankPaint)
+            canvas.drawRect(dockX + w * 0.08f - 3f, dockY, dockX + w * 0.08f, dockY + 12f, bankPaint)
+        }
     }
 
     private fun drawWater(canvas: Canvas, sky: SkyState, params: SceneParams) {
@@ -154,8 +159,8 @@ class RiverScene : VantageScene {
             val drift = (Math.sin(params.elapsedMs / 3000.0 + i) * 2).toFloat()
             canvas.drawOval(x - r + drift, y - r * 0.5f, x + r + drift, y + r * 0.5f, lilyPaint)
 
-            // Flower on some
-            if (rng.next() > 0.5f) {
+            // Flower on some - only in spring/summer
+            if (rng.next() > 0.5f && (params.season == Season.SPRING || params.season == Season.SUMMER)) {
                 lilyPaint.color = 0xFFE8A0C0.toInt()
                 canvas.drawCircle(x + drift, y - 2f, 3f, lilyPaint)
                 lilyPaint.color = 0xFF4A8A3A.toInt()
@@ -187,6 +192,29 @@ class RiverScene : VantageScene {
             canvas.drawLine(x, baseY, x + sway, topY, reedPaint)
         }
         reedPaint.style = Paint.Style.FILL
+    }
+
+    private fun drawWaterMist(canvas: Canvas, params: SceneParams) {
+        // Mist on cold mornings, winter, or fog weather
+        val isColdMorning = params.timeOfDay in 5f..8f
+        val isWinter = params.season == Season.WINTER
+        val isFog = params.weather == WeatherType.FOG
+        if (!isColdMorning && !isWinter && !isFog) return
+
+        val mistAlpha = when {
+            isFog -> 55
+            isWinter -> 40
+            else -> 30
+        }
+        mistPaint.color = 0xFFD8D8D4.toInt()
+        val rng = PRNG(800)
+        for (i in 0 until 5) {
+            val mx = rng.next() * w + (Math.sin(params.elapsedMs / 6000.0 + i) * 12).toFloat()
+            val my = h * 0.48f + rng.next() * h * 0.06f
+            mistPaint.alpha = (mistAlpha + (rng.next() * 15).toInt()).coerceIn(0, 255)
+            canvas.drawOval(mx - 50f, my - 10f, mx + 50f, my + 10f, mistPaint)
+        }
+        mistPaint.alpha = 255
     }
 
     private fun drawForegroundBank(canvas: Canvas, params: SceneParams) {
