@@ -22,15 +22,16 @@ class ForestScene : VantageScene {
         val sky = interpolateSky(params.timeOfDay)
         val haze = hazeColor(sky)
         val p = seasonPalette(params.season)
+        val sunCx = w * 0.72f
 
         drawSkyGradient(canvas, w, h, sky)
         drawStars(canvas, w, h, sky.starsOpacity, params.elapsedMs)
         drawSun(canvas, w, h, sky, cxFrac = 0.72f)
         drawMoon(canvas, w, h, sky, cxFrac = 0.30f)
 
-        drawSoftClouds(canvas, sky, params)
-        drawFarTreeBand(canvas, p, haze, sky)
-        drawMidTreeBand(canvas, p, haze, params)
+        drawSoftClouds(canvas, sky, sunCx, params)
+        drawFarTreeBand(canvas, p, haze, sky, sunCx)
+        drawMidTreeBand(canvas, p, haze, sky, sunCx, params)
         drawMistBand(canvas, haze)
         drawLightShafts(canvas, sky, params)
         drawNearTrees(canvas, p, params)
@@ -76,25 +77,33 @@ class ForestScene : VantageScene {
         )
     }
 
-    private fun drawSoftClouds(canvas: Canvas, sky: SkyState, params: SceneParams) {
-        val base = lerpColor(0xFFFFE2C8.toInt(), sky.midColor, 0.40f)
-        val rim = lerpColor(0xFFFFF8E2.toInt(), sky.topColor, 0.20f)
+    private fun drawSoftClouds(canvas: Canvas, sky: SkyState, sunCx: Float, params: SceneParams) {
+        // wispy cirrus high above
+        val wispCol = lerpColor(0xFFFFE2C8.toInt(), sky.horizonColor, 0.30f)
         val rng = PRNG(81)
         val drift = (params.elapsedMs * 0.000004f) % 1f
-        for (i in 0 until 4) {
+        for (i in 0 until 3) {
             val cx = ((rng.next() + drift) % 1f) * w * 1.4f - w * 0.2f
-            val cy = h * (0.08f + rng.next() * 0.14f)
-            val scale = h * (0.025f + rng.next() * 0.025f)
-            drawFluffyCloud(canvas, cx, cy, scale, base, rim, alpha = 180)
+            val cy = h * (0.07f + rng.next() * 0.10f)
+            val halfW = w * (0.18f + rng.next() * 0.12f)
+            val halfH = h * (0.012f + rng.next() * 0.012f)
+            val alpha = (110 + sky.goldenHour * 70f).toInt().coerceIn(60, 200)
+            drawWispCloud(canvas, cx, cy, halfW, halfH, wispCol, alpha)
+        }
+        // one volumetric cloud during golden hour
+        if (sky.goldenHour > 0.30f) {
+            val base = lerpColor(sky.midColor, 0xFFC68C6E.toInt(), 0.40f)
+            val rim = lerpColor(0xFFFFD8B0.toInt(), sky.horizonColor, 0.25f)
+            drawVolumetricCloud(canvas, sunCx - w * 0.25f, h * 0.20f,
+                w * 0.16f, h * 0.055f, base, rim, sunCx, alpha = 220)
         }
     }
 
-    private fun drawFarTreeBand(canvas: Canvas, p: ForestPalette, haze: Int, sky: SkyState) {
-        // Layered foggy tree-line — a smooth ridge with soft conifer crowns peeking out.
-        smoothRidgePath(path, w, h, h * 0.40f, h * 0.04f, seed = 821)
-        drawAerialLayer(canvas, path, h * 0.32f, h * 0.52f, p.farTree, haze, depth = 0.85f)
+    private fun drawFarTreeBand(canvas: Canvas, p: ForestPalette, haze: Int, sky: SkyState, sunCx: Float) {
+        val layer = RidgeLayer(seed = 821, baseY = h * 0.40f, amplitude = h * 0.04f,
+            color = p.farTree, depth = 0.85f, rim = 0.5f)
+        drawRidgeStack(canvas, w, h, listOf(layer), haze, sky, sunCx)
 
-        // tiny conifers along crest, also fully aerial-faded
         val crownColor = lerpColor(p.farTree, haze, 0.55f)
         val rng = PRNG(8210)
         for (i in 0 until 22) {
@@ -105,9 +114,10 @@ class ForestScene : VantageScene {
         }
     }
 
-    private fun drawMidTreeBand(canvas: Canvas, p: ForestPalette, haze: Int, params: SceneParams) {
-        smoothRidgePath(path, w, h, h * 0.56f, h * 0.05f, seed = 432)
-        drawAerialLayer(canvas, path, h * 0.46f, h * 0.66f, p.midTree, haze, depth = 0.50f)
+    private fun drawMidTreeBand(canvas: Canvas, p: ForestPalette, haze: Int, sky: SkyState, sunCx: Float, params: SceneParams) {
+        val layer = RidgeLayer(seed = 432, baseY = h * 0.56f, amplitude = h * 0.05f,
+            color = p.midTree, depth = 0.50f, rim = 0.7f)
+        drawRidgeStack(canvas, w, h, listOf(layer), haze, sky, sunCx)
 
         val crownColor = lerpColor(p.midTree, haze, 0.30f)
         val rng = PRNG(4320)

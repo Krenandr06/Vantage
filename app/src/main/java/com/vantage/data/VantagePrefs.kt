@@ -13,8 +13,13 @@ class VantagePrefs(context: Context) {
         set(v) = prefs.edit().putBoolean(KEY_ONBOARDING, v).apply()
 
     var currentScene: String
-        get() = prefs.getString(KEY_SCENE, "forest") ?: "forest"
+        get() = prefs.getString(KEY_SCENE, "mountains") ?: "mountains"
         set(v) = prefs.edit().putString(KEY_SCENE, v).apply()
+
+    /** When true, weather is auto-resolved (local feed or sensible default) and manual selection is hidden. */
+    var weatherAuto: Boolean
+        get() = prefs.getBoolean(KEY_WEATHER_AUTO, true)
+        set(v) = prefs.edit().putBoolean(KEY_WEATHER_AUTO, v).apply()
 
     var intensity: Float
         get() = prefs.getFloat(KEY_INTENSITY, 0.5f)
@@ -71,5 +76,6 @@ class VantagePrefs(context: Context) {
         private const val KEY_WEATHER_TYPE = "weather_type"
         private const val KEY_SEASON = "season_override"
         private const val KEY_TIME_OVERRIDE = "time_override"
+        private const val KEY_WEATHER_AUTO = "weather_auto"
     }
 }

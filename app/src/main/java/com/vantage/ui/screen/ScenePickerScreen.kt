@@ -11,8 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.vantage.data.AllScenes
 import com.vantage.data.VantagePrefs
+import com.vantage.data.VisibleScenes
 import com.vantage.ui.component.SceneListItem
 import com.vantage.ui.theme.Bone
 import com.vantage.ui.theme.Graphite
@@ -46,7 +46,7 @@ fun ScenePickerScreen(
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            items(AllScenes) { scene ->
+            items(VisibleScenes) { scene ->
                 SceneListItem(
                     name = scene.name,
                     description = scene.story,

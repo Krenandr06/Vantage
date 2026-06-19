@@ -23,7 +23,10 @@ class WeatherOverlay {
         h = height
     }
 
+    private var elapsedMs = 0L
+
     fun draw(canvas: Canvas, weather: WeatherType, intensity: Float, deltaMs: Long) {
+        elapsedMs += deltaMs
         if (weather == WeatherType.CLEAR) {
             particles = emptyList()
             lastWeather = weather
@@ -38,7 +41,7 @@ class WeatherOverlay {
         val dt = deltaMs / 1000f
 
         when (weather) {
-            WeatherType.RAIN -> drawRain(canvas, dt, intensity)
+            WeatherType.RAIN -> drawRainStreaks(canvas, w, h, elapsedMs, intensity)
             WeatherType.SNOW -> drawSnow(canvas, dt, intensity)
             WeatherType.FOG -> drawFog(canvas, dt, intensity)
             WeatherType.CLOUDY -> drawClouds(canvas, dt, intensity)

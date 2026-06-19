@@ -10,7 +10,6 @@ class MountainsScene : VantageScene {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
-    private val tmpPath = Path()
     private var w = 0
     private var h = 0
 
@@ -22,216 +21,272 @@ class MountainsScene : VantageScene {
     override fun draw(canvas: Canvas, params: SceneParams) {
         val sky = interpolateSky(params.timeOfDay)
         val haze = hazeColor(sky)
+        val sunCx = w * sunCxForTime(params.timeOfDay)
 
         drawSkyGradient(canvas, w, h, sky)
         drawStars(canvas, w, h, sky.starsOpacity, params.elapsedMs)
-        drawSun(canvas, w, h, sky, cxFrac = 0.62f)
-        drawMoon(canvas, w, h, sky, cxFrac = 0.30f)
 
-        drawHighClouds(canvas, sky, params)
-        drawFarRidge(canvas, sky, haze)
-        drawMidRidge(canvas, sky, haze, params)
-        drawFuji(canvas, sky, haze, params)
-        drawLowMist(canvas, haze, sky, params)
-        drawNearForest(canvas, sky, haze, params)
-        drawLake(canvas, sky, haze, params)
-        drawForeground(canvas, sky, haze, params)
+        // High wisps + a single volumetric cloud anchored to the sun side at golden hour
+        drawHighSky(canvas, sky, sunCx, params)
+
+        drawSun(canvas, w, h, sky, cxFrac = sunCx / w)
+        drawMoon(canvas, w, h, sky, cxFrac = 0.18f)
+
+        drawRange(canvas, sky, haze, sunCx, params)
+        drawSeaOfClouds(
+            canvas, w, h,
+            yTop = h * 0.50f, yBot = h * 0.72f,
+            baseColor = lerpColor(haze, sky.horizonColor, 0.35f),
+            rimColor = lerpColor(sky.horizonColor, 0xFFFFFFFF.toInt(), 0.40f),
+            elapsedMs = params.elapsedMs,
+            seed = 4011,
+            density = 1.1f,
+        )
+        drawValleyRidge(canvas, sky, haze, sunCx, params)
+        drawForegroundAnchor(canvas, w, h,
+            topY = h * 0.86f,
+            baseColor = lerpColor(0xFF221d28.toInt(), sky.botColor, 0.10f),
+            seed = 6611,
+        )
         drawPollen(canvas, sky, params)
         drawVignette(canvas, w, h, withAlpha(0xFF000010.toInt(), 80), strength = 0.55f)
     }
 
-    private fun drawHighClouds(canvas: Canvas, sky: SkyState, params: SceneParams) {
-        // Pastel cloud band, soft pink/peach lit by sun direction.
-        val warm = lerpColor(0xFFFFE2D6.toInt(), sky.midColor, 0.25f)
-        val cool = lerpColor(0xFFC8B4D8.toInt(), sky.topColor, 0.25f)
-        val baseColor = lerpColor(warm, cool, 0.4f)
-        val rim = lerpColor(0xFFFFF5E2.toInt(), sky.topColor, 0.15f)
+    private fun sunCxForTime(t: Float): Float {
+        // east-to-west arc: at 6am cxFrac=0.10, at noon=0.50, at 6pm=0.90.
+        val tod = t.coerceIn(5f, 19f)
+        return ((tod - 5f) / 14f).coerceIn(0.10f, 0.90f)
+    }
 
-        val rng = PRNG(101)
-        val drift = (params.elapsedMs * 0.000005f) % 1f
-        val cloudCount = 5
-        for (i in 0 until cloudCount) {
-            val baseX = (rng.next() + drift) % 1f
-            val cx = baseX * w * 1.4f - w * 0.2f
-            val cy = h * (0.10f + rng.next() * 0.18f)
-            val scale = h * (0.030f + rng.next() * 0.030f)
-            val alpha = (170 + rng.next() * 60f).toInt().coerceIn(0, 255)
-            drawFluffyCloud(canvas, cx, cy, scale, baseColor, rim, alpha)
+    private fun drawHighSky(canvas: Canvas, sky: SkyState, sunCx: Float, params: SceneParams) {
+        // 3 cirrus wisps
+        val rng = PRNG(202)
+        val drift = (params.elapsedMs * 0.000003f) % 1f
+        val wispCol = lerpColor(0xFFFFE6CC.toInt(), sky.horizonColor, 0.35f)
+        for (i in 0 until 4) {
+            val cx = ((rng.next() + drift) % 1f) * w * 1.4f - w * 0.2f
+            val cy = h * (0.06f + rng.next() * 0.12f)
+            val halfW = w * (0.18f + rng.next() * 0.14f)
+            val halfH = h * (0.010f + rng.next() * 0.012f)
+            val alpha = (110 + sky.goldenHour * 80f).toInt().coerceIn(60, 200)
+            drawWispCloud(canvas, cx, cy, halfW, halfH, wispCol, alpha)
+        }
+
+        // One hero volumetric cloud near sun during golden hour
+        if (sky.goldenHour > 0.35f) {
+            val cx = sunCx + (if (sunCx > w * 0.5f) -w * 0.22f else w * 0.22f)
+            val cy = h * 0.18f
+            val rx = w * 0.18f
+            val ry = h * 0.06f
+            val base = lerpColor(sky.midColor, 0xFFC68C6E.toInt(), 0.45f)
+            val rim = lerpColor(0xFFFFD8B0.toInt(), sky.horizonColor, 0.25f)
+            drawVolumetricCloud(canvas, cx, cy, rx, ry, base, rim, sunCx, alpha = 230)
         }
     }
 
-    private fun drawFarRidge(canvas: Canvas, sky: SkyState, haze: Int) {
-        val base = lerpColor(0xFF6E7BA0.toInt(), haze, 0.45f)
-        smoothRidgePath(path, w, h, h * 0.46f, h * 0.06f, seed = 211)
-        drawAerialLayer(canvas, path, h * 0.36f, h * 0.55f, base, haze, depth = 0.85f)
-    }
-
-    private fun drawMidRidge(canvas: Canvas, sky: SkyState, haze: Int, params: SceneParams) {
-        val base = lerpColor(0xFF4F5E84.toInt(), haze, 0.30f)
-        smoothRidgePath(path, w, h, h * 0.54f, h * 0.07f, seed = 423)
-        drawAerialLayer(canvas, path, h * 0.42f, h * 0.62f, base, haze, depth = 0.60f)
-
-        // soft snow dust on the higher peaks
+    private fun drawRange(canvas: Canvas, sky: SkyState, haze: Int, sunCx: Float, params: SceneParams) {
         val snowAmt = when (params.season) {
-            Season.WINTER -> 0.45f
-            Season.AUTUMN, Season.SPRING -> 0.25f
-            Season.SUMMER -> 0.10f
+            Season.WINTER -> 0.85f
+            Season.AUTUMN, Season.SPRING -> 0.55f
+            Season.SUMMER -> 0.30f
         }
-        paint.color = withAlpha(0xFFEFEDE6.toInt(), (90 * snowAmt).toInt().coerceIn(0, 255))
-        paint.shader = LinearGradient(
-            0f, h * 0.43f, 0f, h * 0.52f,
-            withAlpha(0xFFFFFFFF.toInt(), (140 * snowAmt).toInt().coerceIn(0, 255)),
-            withAlpha(0xFFFFFFFF.toInt(), 0),
-            Shader.TileMode.CLAMP,
+        // 5 ridges back-to-front + a hero peak.
+        val cool = 0xFF4a5e7e.toInt()
+        val layers = listOf(
+            RidgeLayer(seed = 1101, baseY = h * 0.42f, amplitude = h * 0.05f,
+                color = lerpColor(0xFF7088a8.toInt(), haze, 0.10f), depth = 0.90f, rim = 0.5f, snow = snowAmt * 0.4f),
+            RidgeLayer(seed = 2202, baseY = h * 0.46f, amplitude = h * 0.07f,
+                color = lerpColor(0xFF607896.toInt(), haze, 0.05f), depth = 0.78f, rim = 0.8f, snow = snowAmt * 0.6f),
+            RidgeLayer(seed = 3303, baseY = h * 0.52f, amplitude = h * 0.085f,
+                color = lerpColor(cool, haze, 0.0f), depth = 0.60f, rim = 1.0f, snow = snowAmt),
+            RidgeLayer(seed = 4404, baseY = h * 0.58f, amplitude = h * 0.07f,
+                color = lerpColor(0xFF36465c.toInt(), haze, -0.05f), depth = 0.42f, rim = 0.7f, snow = snowAmt * 0.7f),
         )
-        canvas.drawPath(path, paint)
-        paint.shader = null
+        drawRidgeStack(canvas, w, h, layers, haze, sky, sunCx)
+
+        // Hero peak — a dramatic asymmetric Matterhorn-style summit on the back layer.
+        drawHeroPeak(canvas, sky, haze, sunCx, snowAmt)
     }
 
-    private fun drawFuji(canvas: Canvas, sky: SkyState, haze: Int, params: SceneParams) {
-        // Centerpiece conical peak with snow cap, sitting on a soft horizon haze.
-        val cx = w * 0.42f
-        val peakY = h * 0.30f
-        val baseY = h * 0.62f
-        val halfBase = w * 0.38f
-        coneRidgePath(tmpPath, w, h, cx, peakY, baseY, halfBase)
+    private fun drawHeroPeak(canvas: Canvas, sky: SkyState, haze: Int, sunCx: Float, snowAmt: Float) {
+        // Matterhorn-style: pointed asymmetric summit. Left face steep & smooth,
+        // right face has a jagged shoulder dropping in steps. Sun on the right.
+        val peakCx = w * 0.30f
+        val peakY = h * 0.22f
+        val baseY = h * 0.54f
+        val leftFoot = peakCx - w * 0.32f
+        val rightFoot = peakCx + w * 0.36f
 
-        val base = lerpColor(0xFF6A4E66.toInt(), haze, 0.25f)
-        drawAerialLayer(canvas, tmpPath, peakY, baseY, base, haze, depth = 0.45f)
-
-        // subtle warm rim on the sun-facing side
-        val rim = lerpColor(0xFFE6B69A.toInt(), sky.midColor, 0.45f)
-        paint.shader = LinearGradient(
-            cx - halfBase, peakY, cx + halfBase, baseY,
-            intArrayOf(withAlpha(rim, 0), withAlpha(rim, 80), withAlpha(rim, 0)),
-            floatArrayOf(0f, 0.55f, 1f),
-            Shader.TileMode.CLAMP,
+        path.reset()
+        path.moveTo(leftFoot, baseY)
+        // Smoothly climbing left face — slightly concave near the top
+        path.lineTo(peakCx - w * 0.22f, baseY - h * 0.06f)
+        path.cubicTo(
+            peakCx - w * 0.18f, baseY - h * 0.13f,
+            peakCx - w * 0.10f, baseY - h * 0.24f,
+            peakCx - w * 0.025f, peakY + h * 0.03f,
         )
-        canvas.drawPath(tmpPath, paint)
-        paint.shader = null
+        // Apex
+        path.lineTo(peakCx, peakY)
+        // Right shoulder — jagged step-down
+        path.lineTo(peakCx + w * 0.025f, peakY + h * 0.035f)
+        path.lineTo(peakCx + w * 0.045f, peakY + h * 0.075f)
+        path.lineTo(peakCx + w * 0.080f, peakY + h * 0.110f)
+        path.lineTo(peakCx + w * 0.110f, peakY + h * 0.180f)
+        path.lineTo(peakCx + w * 0.155f, peakY + h * 0.225f)
+        path.lineTo(peakCx + w * 0.220f, peakY + h * 0.280f)
+        path.lineTo(peakCx + w * 0.300f, baseY - h * 0.02f)
+        path.lineTo(rightFoot, baseY)
+        path.lineTo(rightFoot, h.toFloat())
+        path.lineTo(leftFoot, h.toFloat())
+        path.close()
 
-        val capColor = lerpColor(0xFFF7F5EE.toInt(), sky.botColor, 0.10f)
-        drawSnowCap(canvas, cx, peakY, baseY, halfBase, capColor, alpha = 235)
+        val base = lerpColor(0xFF353244.toInt(), haze, 0.05f)
+        drawAerialLayer(canvas, path, peakY, baseY, base, haze, depth = 0.30f)
+
+        // Shadow side (away from sun)
+        val shadow = Path()
+        shadow.moveTo(peakCx, peakY)
+        if (sunCx > peakCx) {
+            // shadow on left face
+            shadow.cubicTo(
+                peakCx - w * 0.10f, baseY - h * 0.24f,
+                peakCx - w * 0.18f, baseY - h * 0.13f,
+                peakCx - w * 0.22f, baseY - h * 0.06f,
+            )
+            shadow.lineTo(leftFoot, baseY)
+            shadow.lineTo(peakCx - w * 0.05f, baseY)
+            shadow.lineTo(peakCx, peakY + h * 0.20f)
+        } else {
+            // shadow on right shoulder
+            shadow.lineTo(peakCx + w * 0.045f, peakY + h * 0.075f)
+            shadow.lineTo(peakCx + w * 0.110f, peakY + h * 0.180f)
+            shadow.lineTo(peakCx + w * 0.220f, peakY + h * 0.280f)
+            shadow.lineTo(peakCx + w * 0.300f, baseY - h * 0.02f)
+            shadow.lineTo(peakCx, baseY - h * 0.02f)
+        }
+        shadow.close()
+        paint.color = withAlpha(0xFF1a1822.toInt(), 100)
+        canvas.drawPath(shadow, paint)
+
+        // Warm rim along the lit side of the silhouette
+        val rim = rimLightColor(sky)
+        paint.strokeWidth = 2.6f
+        paint.style = Paint.Style.STROKE
+        paint.strokeCap = Paint.Cap.ROUND
+        val rimAlpha = (190f * (0.5f + sky.goldenHour * 0.5f)).toInt().coerceIn(80, 220)
+        paint.color = withAlpha(rim, rimAlpha)
+        if (sunCx > peakCx) {
+            // rim on right shoulder
+            canvas.drawLine(peakCx, peakY, peakCx + w * 0.025f, peakY + h * 0.035f, paint)
+            canvas.drawLine(peakCx + w * 0.025f, peakY + h * 0.035f, peakCx + w * 0.045f, peakY + h * 0.075f, paint)
+            canvas.drawLine(peakCx + w * 0.045f, peakY + h * 0.075f, peakCx + w * 0.080f, peakY + h * 0.110f, paint)
+            canvas.drawLine(peakCx + w * 0.080f, peakY + h * 0.110f, peakCx + w * 0.110f, peakY + h * 0.180f, paint)
+            canvas.drawLine(peakCx + w * 0.110f, peakY + h * 0.180f, peakCx + w * 0.155f, peakY + h * 0.225f, paint)
+        } else {
+            // rim on left face — single curve
+            path.reset()
+            path.moveTo(peakCx, peakY)
+            path.cubicTo(
+                peakCx - w * 0.025f, peakY + h * 0.05f,
+                peakCx - w * 0.10f, baseY - h * 0.24f,
+                peakCx - w * 0.22f, baseY - h * 0.06f,
+            )
+            canvas.drawPath(path, paint)
+        }
+        paint.style = Paint.Style.FILL
+        paint.strokeCap = Paint.Cap.BUTT
+
+        // Snow cap — small irregular patches near the summit, NOT a triangle reaching the apex.
+        // Place a few small white blobs on the upper third of each face, biased to the lit side.
+        drawSnowPatches(canvas, sky, peakCx, peakY, baseY, sunCx, snowAmt)
     }
 
-    private fun drawLowMist(canvas: Canvas, haze: Int, sky: SkyState, params: SceneParams) {
-        // a soft fog layer hanging at the foot of the mountains — sells aerial perspective.
-        val mistCol = lerpColor(haze, 0xFFFFFFFF.toInt(), 0.35f)
-        drawHazeBand(canvas, w, h * 0.55f, h * 0.66f, mistCol, peakAlpha = 150)
+    private fun drawSnowPatches(
+        canvas: Canvas,
+        sky: SkyState,
+        peakCx: Float,
+        peakY: Float,
+        baseY: Float,
+        sunCx: Float,
+        snowAmt: Float,
+    ) {
+        val capCol = lerpColor(0xFFF8F2E6.toInt(), sky.horizonColor, 0.15f)
+        val capColShadow = lerpColor(capCol, 0xFF6a7090.toInt(), 0.35f)
+        val sunSide = if (sunCx > peakCx) 1f else -1f
+        val rng = PRNG(8801)
+        val blobCount = (5 + snowAmt * 6f).toInt()
+        for (i in 0 until blobCount) {
+            val t = rng.next() // 0..1 along the ridge from the peak down
+            // bias more snow toward the top (small t)
+            val tt = t * t
+            // mostly on the lit side
+            val side = if (rng.next() < 0.78f) sunSide else -sunSide
+            val depth = tt * 0.30f
+            val cx = peakCx + side * w * (0.005f + depth)
+            val cy = peakY + h * (0.005f + tt * 0.20f)
+            val rx = w * (0.012f + rng.next() * 0.016f)
+            val ry = h * (0.008f + rng.next() * 0.010f)
+            // shadow underneath
+            paint.color = withAlpha(capColShadow, 100)
+            canvas.drawOval(cx - rx, cy - ry * 0.4f, cx + rx, cy + ry * 1.1f, paint)
+            // main blob — irregular by jittering control points
+            path.reset()
+            path.moveTo(cx - rx, cy)
+            path.cubicTo(
+                cx - rx * 0.6f, cy - ry * (1.3f + rng.next() * 0.4f),
+                cx + rx * 0.4f, cy - ry * (1.1f + rng.next() * 0.5f),
+                cx + rx, cy - ry * 0.2f,
+            )
+            path.cubicTo(
+                cx + rx * 0.6f, cy + ry * 0.7f,
+                cx - rx * 0.4f, cy + ry * 0.6f,
+                cx - rx, cy,
+            )
+            path.close()
+            paint.color = withAlpha(capCol, (220f * (0.55f + snowAmt * 0.45f)).toInt().coerceIn(120, 240))
+            canvas.drawPath(path, paint)
+        }
+        // A tiny snow tip right at the apex
+        val tipR = w * 0.010f
+        paint.color = withAlpha(capCol, (200f * (0.55f + snowAmt * 0.45f)).toInt())
+        canvas.drawCircle(peakCx, peakY + tipR * 0.4f, tipR, paint)
     }
 
-    private fun drawNearForest(canvas: Canvas, sky: SkyState, haze: Int, params: SceneParams) {
+    private fun drawValleyRidge(canvas: Canvas, sky: SkyState, haze: Int, sunCx: Float, params: SceneParams) {
+        // Single near foreground ridge sitting in front of the sea of clouds — gives depth past the fog.
         val base = when (params.season) {
-            Season.SUMMER -> 0xFF3D5A48.toInt()
-            Season.SPRING -> 0xFF49684A.toInt()
-            Season.AUTUMN -> 0xFF8A5A38.toInt()
-            Season.WINTER -> 0xFF4A5060.toInt()
+            Season.SUMMER -> 0xFF2a3a30.toInt()
+            Season.SPRING -> 0xFF34492f.toInt()
+            Season.AUTUMN -> 0xFF6a4426.toInt()
+            Season.WINTER -> 0xFF34384a.toInt()
         }
-        smoothRidgePath(path, w, h, h * 0.68f, h * 0.05f, seed = 631)
-        drawAerialLayer(canvas, path, h * 0.60f, h * 0.78f, base, haze, depth = 0.25f)
-
-        // tiny conifer silhouettes on the crest
-        val pineColor = lerpColor(base, 0xFF000000.toInt(), 0.35f)
-        paint.color = pineColor
-        val rng = PRNG(6310)
-        for (i in 0 until 26) {
-            val px = rng.next() * w
-            val baseY = h * 0.66f + rng.next() * h * 0.04f
-            val treeH = h * 0.025f + rng.next() * h * 0.035f
-            val treeW = treeH * 0.30f
-            tmpPath.reset()
-            tmpPath.moveTo(px, baseY - treeH)
-            tmpPath.quadTo(px - treeW * 0.6f, baseY - treeH * 0.3f, px - treeW, baseY)
-            tmpPath.lineTo(px + treeW, baseY)
-            tmpPath.quadTo(px + treeW * 0.6f, baseY - treeH * 0.3f, px, baseY - treeH)
-            tmpPath.close()
-            canvas.drawPath(tmpPath, paint)
-        }
-    }
-
-    private fun drawLake(canvas: Canvas, sky: SkyState, haze: Int, params: SceneParams) {
-        val top = h * 0.78f
-        val bot = h * 0.92f
-
-        // base water — mirrors lower sky / haze
-        val water = lerpColor(sky.botColor, 0xFF2A4060.toInt(), 0.50f)
-        paint.shader = LinearGradient(
-            0f, top, 0f, bot,
-            lerpColor(water, sky.midColor, 0.25f), lerpColor(water, 0xFF101828.toInt(), 0.45f),
-            Shader.TileMode.CLAMP,
+        val layer = RidgeLayer(
+            seed = 5505, baseY = h * 0.78f, amplitude = h * 0.045f,
+            color = lerpColor(base, sky.botColor, 0.05f), depth = 0.18f, rim = 0.4f,
         )
-        canvas.drawRect(0f, top, w.toFloat(), bot, paint)
-        paint.shader = null
+        drawRidgeStack(canvas, w, h, listOf(layer), haze, sky, sunCx)
 
-        // Soft inverted reflection of mountain glow
-        val refl = lerpColor(haze, 0xFFFFFFFF.toInt(), 0.20f)
-        paint.shader = LinearGradient(
-            0f, top, 0f, top + (bot - top) * 0.65f,
-            intArrayOf(withAlpha(refl, 90), withAlpha(refl, 0)),
-            floatArrayOf(0f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawRect(0f, top, w.toFloat(), bot, paint)
-        paint.shader = null
-
-        // ripples
-        paint.color = withAlpha(0xFFFFFFFF.toInt(), 60)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1.2f
-        val rng = PRNG(555)
-        val intensity = 0.4f + params.intensity * 0.6f
-        for (i in 0 until 14) {
-            val rx = rng.next() * w
-            val ry = top + rng.next() * (bot - top)
-            val phase = (params.elapsedMs / 2200.0 + rng.next() * 6.28).toFloat()
-            val rl = (12f + (Math.sin(phase.toDouble()) * 8.0).toFloat()) * intensity
-            val a = ((40 + Math.sin(phase.toDouble()) * 30.0) * intensity).toInt().coerceIn(0, 255)
-            paint.alpha = a
-            canvas.drawLine(rx - rl, ry, rx + rl, ry, paint)
-        }
-        paint.style = Paint.Style.FILL
-        paint.alpha = 255
-
-        // soft shoreline haze
-        drawHazeBand(canvas, w, top - h * 0.02f, top + h * 0.015f, lerpColor(haze, 0xFFFFFFFF.toInt(), 0.4f), 130)
-    }
-
-    private fun drawForeground(canvas: Canvas, sky: SkyState, haze: Int, params: SceneParams) {
-        val top = h * 0.92f
-        val groundDark = lerpColor(0xFF1A2228.toInt(), sky.botColor, 0.10f)
-        paint.shader = LinearGradient(
-            0f, top, 0f, h.toFloat(),
-            lerpColor(groundDark, 0xFF000000.toInt(), 0.15f), 0xFF06080C.toInt(),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawRect(0f, top, w.toFloat(), h.toFloat(), paint)
-        paint.shader = null
-
-        // grass strands
-        paint.color = lerpColor(0xFF6A8A60.toInt(), groundDark, 0.5f)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1.6f
-        val rng = PRNG(666)
-        for (i in 0 until 36) {
+        // tiny conifer crests
+        val crestCol = lerpColor(base, 0xFF000000.toInt(), 0.35f)
+        val rng = PRNG(5510)
+        for (i in 0 until 22) {
             val x = rng.next() * w
-            val y = top + rng.next() * (h - top) * 0.7f
-            val sway = (Math.sin(params.elapsedMs / 2500.0 + i) * 3.0 * params.intensity).toFloat()
-            canvas.drawLine(x, y + 6f, x + sway, y - 12f, paint)
-            canvas.drawLine(x - 3f, y + 6f, x - 3f + sway * 0.7f, y - 8f, paint)
-            canvas.drawLine(x + 3f, y + 6f, x + 3f + sway * 1.2f, y - 10f, paint)
+            val baseY = h * 0.76f + rng.next() * h * 0.025f
+            val treeH = h * 0.02f + rng.next() * h * 0.025f
+            drawPaintedConifer(canvas, x, baseY, treeH, crestCol)
         }
-        paint.style = Paint.Style.FILL
     }
 
     private fun drawPollen(canvas: Canvas, sky: SkyState, params: SceneParams) {
-        val warmth = lerpColor(0xFFFFF5DA.toInt(), sky.midColor, 0.20f)
+        val warmth = lerpColor(0xFFFFF5DA.toInt(), sky.horizonColor, 0.20f)
         drawSparkles(
             canvas, w, h,
-            count = (20 + params.intensity * 30f).toInt(),
+            count = (18 + params.intensity * 26f).toInt(),
             seed = 909,
-            color = withAlpha(warmth, 180),
+            color = withAlpha(warmth, 160),
             elapsedMs = params.elapsedMs,
-            intensity = 0.6f + params.intensity * 0.4f,
+            intensity = 0.5f + params.intensity * 0.4f,
             yLimit = 0.78f,
         )
     }

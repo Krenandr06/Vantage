@@ -10,41 +10,56 @@ import android.graphics.Color as AColor
 data class SkyAnchor(
     val t: Float,
     val top: Int,
+    val upper: Int,
     val mid: Int,
+    val horizon: Int,
     val bot: Int,
     val starsOp: Float = 0f,
     val sunY: Float = -1f,
     val sunSize: Float = 0f,
     val moonY: Float = -1f,
     val moonSize: Float = 0f,
+    val golden: Float = 0f,
 )
 
 private val SKY_ANCHORS = listOf(
-    SkyAnchor(0f, 0xFF0a0e1a.toInt(), 0xFF161a2a.toInt(), 0xFF1c2030.toInt(), starsOp = 0.95f, moonY = 0.25f, moonSize = 44f),
-    SkyAnchor(4.5f, 0xFF101428.toInt(), 0xFF1a1e38.toInt(), 0xFF242840.toInt(), starsOp = 0.85f, moonY = 0.35f, moonSize = 42f),
-    SkyAnchor(5.8f, 0xFF2a2842.toInt(), 0xFF5a3e58.toInt(), 0xFFa86a5e.toInt(), starsOp = 0.25f, sunY = 0.96f, sunSize = 86f),
-    SkyAnchor(6.5f, 0xFF6a4a78.toInt(), 0xFFb47868.toInt(), 0xFFe8a878.toInt(), starsOp = 0.05f, sunY = 0.88f, sunSize = 82f),
-    SkyAnchor(7f, 0xFF7090a8.toInt(), 0xFF98b0c0.toInt(), 0xFFd4c6aa.toInt(), sunY = 0.78f, sunSize = 72f),
-    SkyAnchor(8f, 0xFF88b4d0.toInt(), 0xFFa6c8da.toInt(), 0xFFd6d8c4.toInt(), sunY = 0.62f, sunSize = 62f),
-    SkyAnchor(10f, 0xFF78b8e8.toInt(), 0xFF94caea.toInt(), 0xFFcce0e2.toInt(), sunY = 0.38f, sunSize = 56f),
-    SkyAnchor(12f, 0xFF68b0f0.toInt(), 0xFF8cc6f0.toInt(), 0xFFbcdcec.toInt(), sunY = 0.22f, sunSize = 54f),
-    SkyAnchor(14f, 0xFF78b8e8.toInt(), 0xFF94caea.toInt(), 0xFFcce0e2.toInt(), sunY = 0.30f, sunSize = 56f),
-    SkyAnchor(16f, 0xFF88b4d0.toInt(), 0xFFa6c8da.toInt(), 0xFFd6d8c4.toInt(), sunY = 0.52f, sunSize = 62f),
-    SkyAnchor(17.5f, 0xFFa28060.toInt(), 0xFFd49050.toInt(), 0xFFf2a648.toInt(), sunY = 0.78f, sunSize = 76f),
-    SkyAnchor(18.5f, 0xFF5a3050.toInt(), 0xFF923a4a.toInt(), 0xFFd47038.toInt(), sunY = 0.92f, sunSize = 86f),
-    SkyAnchor(19.5f, 0xFF2a1838.toInt(), 0xFF3a2848.toInt(), 0xFF5a3850.toInt(), starsOp = 0.15f),
-    SkyAnchor(21f, 0xFF0a0e1a.toInt(), 0xFF161a2a.toInt(), 0xFF1c2030.toInt(), starsOp = 0.9f, moonY = 0.40f, moonSize = 42f),
+    // pre-dawn
+    SkyAnchor(0f,    0xFF080B17.toInt(), 0xFF0c1124.toInt(), 0xFF141a30.toInt(), 0xFF1c2236.toInt(), 0xFF222840.toInt(), starsOp = 0.95f, moonY = 0.25f, moonSize = 44f),
+    SkyAnchor(4.5f,  0xFF0e1228.toInt(), 0xFF161c38.toInt(), 0xFF22264a.toInt(), 0xFF2e3258.toInt(), 0xFF38406a.toInt(), starsOp = 0.85f, moonY = 0.35f, moonSize = 42f),
+    // first light — warm horizon band emerges
+    SkyAnchor(5.6f,  0xFF1a1c3a.toInt(), 0xFF35334e.toInt(), 0xFF5a3e5e.toInt(), 0xFF9c5c52.toInt(), 0xFFc47a52.toInt(), starsOp = 0.40f, sunY = 0.98f, sunSize = 90f, golden = 0.55f),
+    // sunrise — peak golden
+    SkyAnchor(6.4f,  0xFF3a3a64.toInt(), 0xFF6a587a.toInt(), 0xFFa6786e.toInt(), 0xFFe89a6a.toInt(), 0xFFf8c486.toInt(), starsOp = 0.10f, sunY = 0.88f, sunSize = 82f, golden = 1.0f),
+    // morning haze
+    SkyAnchor(7.2f,  0xFF6a8aae.toInt(), 0xFF8aa6c2.toInt(), 0xFFb4c6d4.toInt(), 0xFFd8cab4.toInt(), 0xFFe6d4be.toInt(), sunY = 0.78f, sunSize = 72f, golden = 0.55f),
+    SkyAnchor(8.5f,  0xFF7eaad0.toInt(), 0xFF9ac0dc.toInt(), 0xFFbcd6e2.toInt(), 0xFFd8dccc.toInt(), 0xFFe2dec8.toInt(), sunY = 0.58f, sunSize = 62f, golden = 0.20f),
+    SkyAnchor(11f,   0xFF5aa4ea.toInt(), 0xFF7ab8ec.toInt(), 0xFF98c8ea.toInt(), 0xFFb4d6e0.toInt(), 0xFFc6e0e0.toInt(), sunY = 0.28f, sunSize = 56f, golden = 0.05f),
+    SkyAnchor(13f,   0xFF4e9eec.toInt(), 0xFF74b6ec.toInt(), 0xFF94c6ea.toInt(), 0xFFb0d2e0.toInt(), 0xFFbcdce4.toInt(), sunY = 0.22f, sunSize = 54f, golden = 0.05f),
+    SkyAnchor(15f,   0xFF5aa4ea.toInt(), 0xFF7ab8ec.toInt(), 0xFF98c8ea.toInt(), 0xFFb4d6e0.toInt(), 0xFFc6e0e0.toInt(), sunY = 0.32f, sunSize = 56f, golden = 0.10f),
+    SkyAnchor(16.5f, 0xFF7eaad0.toInt(), 0xFF9ac0dc.toInt(), 0xFFbcd6e2.toInt(), 0xFFd8d0bc.toInt(), 0xFFe6cea4.toInt(), sunY = 0.54f, sunSize = 64f, golden = 0.40f),
+    // golden hour evening
+    SkyAnchor(17.6f, 0xFF8a7aae.toInt(), 0xFFa680a0.toInt(), 0xFFc88072.toInt(), 0xFFe89060.toInt(), 0xFFf6b066.toInt(), sunY = 0.74f, sunSize = 76f, golden = 0.90f),
+    // sunset — deep
+    SkyAnchor(18.4f, 0xFF4a3068.toInt(), 0xFF7c3a64.toInt(), 0xFFb44a44.toInt(), 0xFFe06038.toInt(), 0xFFf07a30.toInt(), sunY = 0.90f, sunSize = 88f, golden = 1.0f),
+    // dusk
+    SkyAnchor(19.4f, 0xFF1c1838.toInt(), 0xFF2e2244.toInt(), 0xFF4c2c4c.toInt(), 0xFF6c3848.toInt(), 0xFF8a4438.toInt(), starsOp = 0.15f, golden = 0.55f),
+    // twilight
+    SkyAnchor(20.4f, 0xFF0e1226.toInt(), 0xFF161a32.toInt(), 0xFF22243e.toInt(), 0xFF2c2e48.toInt(), 0xFF383a54.toInt(), starsOp = 0.70f, moonY = 0.30f, moonSize = 44f),
+    SkyAnchor(22f,   0xFF080b17.toInt(), 0xFF0c1124.toInt(), 0xFF141a30.toInt(), 0xFF1c2236.toInt(), 0xFF222840.toInt(), starsOp = 0.92f, moonY = 0.40f, moonSize = 42f),
 )
 
 data class SkyState(
     val topColor: Int,
+    val upperColor: Int,
     val midColor: Int,
+    val horizonColor: Int,
     val botColor: Int,
     val starsOpacity: Float,
     val sunY: Float,
     val sunSize: Float,
     val moonY: Float,
     val moonSize: Float,
+    val goldenHour: Float,
 )
 
 fun interpolateSky(time: Float): SkyState {
@@ -68,26 +83,35 @@ fun interpolateSky(time: Float): SkyState {
         val d = if (t >= lo.t) t - lo.t else t + 24f - lo.t
         (d / range).coerceIn(0f, 1f)
     } else 0f
+    // ease the interpolation a touch so transitions feel painted, not linear
+    val f = smoothstep(frac)
 
     return SkyState(
-        topColor = lerpColor(lo.top, hi.top, frac),
-        midColor = lerpColor(lo.mid, hi.mid, frac),
-        botColor = lerpColor(lo.bot, hi.bot, frac),
-        starsOpacity = lerp(lo.starsOp, hi.starsOp, frac),
-        sunY = lerp(lo.sunY, hi.sunY, frac),
-        sunSize = lerp(lo.sunSize, hi.sunSize, frac),
-        moonY = lerp(lo.moonY, hi.moonY, frac),
-        moonSize = lerp(lo.moonSize, hi.moonSize, frac),
+        topColor = lerpColor(lo.top, hi.top, f),
+        upperColor = lerpColor(lo.upper, hi.upper, f),
+        midColor = lerpColor(lo.mid, hi.mid, f),
+        horizonColor = lerpColor(lo.horizon, hi.horizon, f),
+        botColor = lerpColor(lo.bot, hi.bot, f),
+        starsOpacity = lerp(lo.starsOp, hi.starsOp, f),
+        sunY = lerp(lo.sunY, hi.sunY, f),
+        sunSize = lerp(lo.sunSize, hi.sunSize, f),
+        moonY = lerp(lo.moonY, hi.moonY, f),
+        moonSize = lerp(lo.moonSize, hi.moonSize, f),
+        goldenHour = lerp(lo.golden, hi.golden, f),
     )
 }
 
 private val skyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+/**
+ * 5-stop sky gradient. Stops are tuned so the warm horizon band reads at a
+ * realistic ~80–95% down the screen instead of bleeding halfway up.
+ */
 fun drawSkyGradient(canvas: Canvas, w: Int, h: Int, sky: SkyState) {
     skyPaint.shader = LinearGradient(
         0f, 0f, 0f, h.toFloat(),
-        intArrayOf(sky.topColor, sky.midColor, sky.botColor),
-        floatArrayOf(0f, 0.5f, 1f),
+        intArrayOf(sky.topColor, sky.upperColor, sky.midColor, sky.horizonColor, sky.botColor),
+        floatArrayOf(0f, 0.35f, 0.62f, 0.84f, 1f),
         Shader.TileMode.CLAMP,
     )
     canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), skyPaint)
@@ -99,8 +123,8 @@ fun drawSun(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.5f,
     val cx = w * cxFrac
     val cy = h * sky.sunY
     val r = sky.sunSize * sizeScale
-    val warm = lerpColor(0xFFFFE5B0.toInt(), sky.botColor, 0.25f)
-    drawSoftGlow(canvas, cx, cy, r, withAlpha(warm, 220), intensity = 1f)
+    val warm = lerpColor(0xFFFFE5B0.toInt(), sky.horizonColor, 0.25f)
+    drawSoftGlow(canvas, cx, cy, r, withAlpha(warm, 220), intensity = 1f + sky.goldenHour * 0.4f)
     skyPaint.shader = RadialGradient(
         cx, cy, r,
         intArrayOf(0xFFFFF6DE.toInt(), withAlpha(warm, 255)),
@@ -126,13 +150,18 @@ fun drawMoon(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.65
     )
     canvas.drawCircle(cx, cy, r, skyPaint)
     skyPaint.shader = null
+
+    // subtle mare shading
+    skyPaint.color = withAlpha(0xFF8A8E9A.toInt(), 55)
+    canvas.drawCircle(cx - r * 0.22f, cy - r * 0.10f, r * 0.18f, skyPaint)
+    canvas.drawCircle(cx + r * 0.18f, cy + r * 0.15f, r * 0.13f, skyPaint)
     skyPaint.alpha = 255
 }
 
 fun drawStars(canvas: Canvas, w: Int, h: Int, opacity: Float, elapsedMs: Long) {
     if (opacity <= 0.02f) return
     val rng = PRNG(42)
-    val count = 80
+    val count = 90
     skyPaint.color = AColor.WHITE
     for (i in 0 until count) {
         val x = rng.next() * w
@@ -146,6 +175,11 @@ fun drawStars(canvas: Canvas, w: Int, h: Int, opacity: Float, elapsedMs: Long) {
 }
 
 fun lerp(a: Float, b: Float, f: Float): Float = a + (b - a) * f
+
+fun smoothstep(x: Float): Float {
+    val t = x.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
 
 fun lerpColor(c1: Int, c2: Int, f: Float): Int {
     val a = lerp(AColor.alpha(c1).toFloat(), AColor.alpha(c2).toFloat(), f).toInt()

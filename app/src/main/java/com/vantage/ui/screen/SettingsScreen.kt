@@ -67,8 +67,10 @@ fun SettingsScreen(onBack: () -> Unit) {
     val haptic = LocalHapticFeedback.current
 
     var weatherType by remember { mutableStateOf(prefs.weatherType) }
+    var weatherAuto by remember { mutableStateOf(prefs.weatherAuto) }
     var seasonOverride by remember { mutableStateOf(prefs.seasonOverride) }
     var timeOverride by remember { mutableFloatStateOf(prefs.timeOverride) }
+    var timeAuto by remember { mutableStateOf(prefs.useAutoTime) }
     var intensity by remember { mutableFloatStateOf(prefs.intensity) }
     var locationEnabled by remember { mutableStateOf(prefs.locationEnabled) }
     var weatherEnabled by remember { mutableStateOf(prefs.weatherEnabled) }
@@ -111,108 +113,142 @@ fun SettingsScreen(onBack: () -> Unit) {
             SoftCard {
                 CardHeader("Scene", "Mood, light, and weather of your wallpaper.")
 
-                // Weather (with Randomize)
-                FieldHeader("Weather", "Overlay applied to all scenes")
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    listOf("clear", "rain", "snow", "fog", "cloudy").forEach { wOpt ->
-                        Pill(
-                            label = wOpt.replaceFirstChar { it.uppercase() },
-                            active = weatherType == wOpt,
-                            onClick = {
-                                weatherType = wOpt
-                                prefs.weatherType = wOpt
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
+                // Weather — auto toggle + (when manual) pill selector
+                FieldRowWithAuto(
+                    label = "Weather",
+                    subtitle = if (weatherAuto) "Auto — picked daily for the scene"
+                               else "Overlay applied to all scenes",
+                    autoLabel = "Auto",
+                    isAuto = weatherAuto,
+                    onToggleAuto = {
+                        weatherAuto = !weatherAuto
+                        prefs.weatherAuto = weatherAuto
+                    },
+                )
+                if (!weatherAuto) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        listOf("clear", "rain", "snow", "fog", "cloudy").forEach { wOpt ->
+                            Pill(
+                                label = wOpt.replaceFirstChar { it.uppercase() },
+                                active = weatherType == wOpt,
+                                onClick = {
+                                    weatherType = wOpt
+                                    prefs.weatherType = wOpt
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
-                }
-                Spacer(Modifier.height(10.dp))
-                RandomizeWeatherButton(onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.Companion.LongPress)
-                    val resolvedSeason = when (prefs.seasonOverride) {
-                        "spring" -> Season.SPRING
-                        "summer" -> Season.SUMMER
-                        "autumn" -> Season.AUTUMN
-                        "winter" -> Season.WINTER
-                        else -> currentSeason()
-                    }
-                    val picked = randomizeWeather(prefs.currentScene, resolvedSeason)
-                    weatherType = picked
-                    prefs.weatherType = picked
-                })
-
-                Spacer(Modifier.height(18.dp))
-
-                // Season
-                FieldHeader("Season", "Auto follows your calendar")
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    listOf("auto", "spring", "summer", "autumn", "winter").forEach { s ->
-                        Pill(
-                            label = s.replaceFirstChar { it.uppercase() },
-                            active = seasonOverride == s,
-                            onClick = {
-                                seasonOverride = s
-                                prefs.seasonOverride = s
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    Spacer(Modifier.height(10.dp))
+                    RandomizeWeatherButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.Companion.LongPress)
+                        val resolvedSeason = when (prefs.seasonOverride) {
+                            "spring" -> Season.SPRING
+                            "summer" -> Season.SUMMER
+                            "autumn" -> Season.AUTUMN
+                            "winter" -> Season.WINTER
+                            else -> currentSeason()
+                        }
+                        val picked = randomizeWeather(prefs.currentScene, resolvedSeason)
+                        weatherType = picked
+                        prefs.weatherType = picked
+                    })
                 }
 
                 Spacer(Modifier.height(18.dp))
 
-                // Time of day
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text("Time of day", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            if (timeOverride < 0f) "Following device clock"
-                            else "${timeLabel(timeOverride)} — ${phaseLabel(timeOverride)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (timeOverride < 0f) GraphiteSoft else Clay,
-                        )
-                    }
-                    if (timeOverride >= 0f) {
-                        TextButton(onClick = {
-                            timeOverride = -1f
-                            prefs.timeOverride = -1f
-                        }) {
-                            Text("Auto", color = Clay, fontSize = 13.sp)
+                // Season — auto toggle + (when manual) season pills
+                val seasonAuto = seasonOverride == "auto"
+                FieldRowWithAuto(
+                    label = "Season",
+                    subtitle = if (seasonAuto) "Following your calendar"
+                               else seasonOverride.replaceFirstChar { it.uppercase() },
+                    autoLabel = "Auto",
+                    isAuto = seasonAuto,
+                    onToggleAuto = {
+                        val next = if (seasonAuto) {
+                            // Coming out of auto — seed with current calendar season
+                            when (currentSeason()) {
+                                Season.SPRING -> "spring"
+                                Season.SUMMER -> "summer"
+                                Season.AUTUMN -> "autumn"
+                                Season.WINTER -> "winter"
+                            }
+                        } else "auto"
+                        seasonOverride = next
+                        prefs.seasonOverride = next
+                    },
+                )
+                if (!seasonAuto) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        listOf("spring", "summer", "autumn", "winter").forEach { s ->
+                            Pill(
+                                label = s.replaceFirstChar { it.uppercase() },
+                                active = seasonOverride == s,
+                                onClick = {
+                                    seasonOverride = s
+                                    prefs.seasonOverride = s
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Slider(
-                    value = if (timeOverride < 0f) 12f else timeOverride,
-                    onValueChange = {
-                        timeOverride = it
-                        prefs.timeOverride = it
+
+                Spacer(Modifier.height(18.dp))
+
+                // Time of day — auto toggle + (when manual) slider
+                FieldRowWithAuto(
+                    label = "Time of day",
+                    subtitle = if (timeAuto) "Following device clock"
+                               else "${timeLabel(timeOverride)} — ${phaseLabel(timeOverride)}",
+                    autoLabel = "Auto",
+                    isAuto = timeAuto,
+                    onToggleAuto = {
+                        timeAuto = !timeAuto
+                        if (timeAuto) {
+                            timeOverride = -1f
+                            prefs.timeOverride = -1f
+                        } else {
+                            // Coming out of auto — seed with current device time
+                            val seed = com.vantage.scene.currentTimeOfDay()
+                            timeOverride = seed
+                            prefs.timeOverride = seed
+                        }
                     },
-                    valueRange = 0f..24f,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = SliderDefaults.colors(
-                        thumbColor = Clay,
-                        activeTrackColor = Clay,
-                        inactiveTrackColor = Hair,
-                    ),
                 )
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    listOf("12a", "6a", "12p", "6p", "12a").forEach {
-                        Text(it, fontSize = 10.sp, color = GraphiteMute)
+                if (!timeAuto) {
+                    Spacer(Modifier.height(8.dp))
+                    Slider(
+                        value = if (timeOverride < 0f) 12f else timeOverride,
+                        onValueChange = {
+                            timeOverride = it
+                            prefs.timeOverride = it
+                        },
+                        valueRange = 0f..24f,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Clay,
+                            activeTrackColor = Clay,
+                            inactiveTrackColor = Hair,
+                        ),
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        listOf("12a", "6a", "12p", "6p", "12a").forEach {
+                            Text(it, fontSize = 10.sp, color = GraphiteMute)
+                        }
                     }
                 }
 
@@ -342,6 +378,79 @@ private fun FieldHeader(title: String, subtitle: String? = null) {
         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
     }
     Spacer(Modifier.height(8.dp))
+}
+
+/**
+ * A field header with a compact Auto chip on the right. When Auto is on, the chip
+ * is filled; tapping toggles. The subtitle communicates current state to the user.
+ */
+@Composable
+private fun FieldRowWithAuto(
+    label: String,
+    subtitle: String?,
+    autoLabel: String,
+    isAuto: Boolean,
+    onToggleAuto: () -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isAuto) GraphiteSoft else Clay,
+                )
+            }
+        }
+        AutoChip(
+            label = autoLabel,
+            active = isAuto,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.Companion.LongPress)
+                onToggleAuto()
+            },
+        )
+    }
+}
+
+@Composable
+private fun AutoChip(
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    val bg by animateColorAsState(
+        if (active) Clay else Color.White.copy(alpha = 0.65f),
+        animationSpec = tween(180),
+        label = "auto_bg",
+    )
+    val fg by animateColorAsState(
+        if (active) Bone else Graphite,
+        animationSpec = tween(180),
+        label = "auto_fg",
+    )
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .border(1.dp, if (active) Clay else Hair, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+        )
+    }
 }
 
 @Composable

@@ -18,15 +18,15 @@ class RiverScene : VantageScene {
     override fun draw(canvas: Canvas, params: SceneParams) {
         val sky = interpolateSky(params.timeOfDay)
         val haze = hazeColor(sky)
+        val sunCx = w * 0.5f
 
         drawSkyGradient(canvas, w, h, sky)
         drawStars(canvas, w, h, sky.starsOpacity, params.elapsedMs)
         drawSun(canvas, w, h, sky, cxFrac = 0.5f)
         drawMoon(canvas, w, h, sky, cxFrac = 0.78f)
 
-        drawClouds(canvas, sky, params)
-        drawDistantMountains(canvas, sky, haze)
-        drawMidHills(canvas, haze, params)
+        drawClouds(canvas, sky, sunCx, params)
+        drawHills(canvas, sky, haze, sunCx, params)
         drawHazeBand(canvas, w, h * 0.45f, h * 0.52f, lerpColor(haze, 0xFFFFFFFF.toInt(), 0.35f), peakAlpha = 130)
         drawFarBank(canvas, haze, params)
         drawWater(canvas, sky, haze, params)
@@ -37,33 +37,40 @@ class RiverScene : VantageScene {
         drawVignette(canvas, w, h, withAlpha(0xFF000010.toInt(), 80), strength = 0.55f)
     }
 
-    private fun drawClouds(canvas: Canvas, sky: SkyState, params: SceneParams) {
-        val warm = lerpColor(0xFFFFE0CC.toInt(), sky.midColor, 0.35f)
-        val rim = lerpColor(0xFFFFF6E0.toInt(), sky.topColor, 0.20f)
+    private fun drawClouds(canvas: Canvas, sky: SkyState, sunCx: Float, params: SceneParams) {
+        val wispCol = lerpColor(0xFFFFE0CC.toInt(), sky.horizonColor, 0.30f)
         val rng = PRNG(111)
-        val drift = (params.elapsedMs * 0.000005f) % 1f
-        for (i in 0 until 5) {
+        val drift = (params.elapsedMs * 0.000004f) % 1f
+        for (i in 0 until 4) {
             val cx = ((rng.next() + drift) % 1f) * w * 1.4f - w * 0.2f
-            val cy = h * (0.08f + rng.next() * 0.14f)
-            val scale = h * (0.028f + rng.next() * 0.030f)
-            drawFluffyCloud(canvas, cx, cy, scale, warm, rim, alpha = 195)
+            val cy = h * (0.08f + rng.next() * 0.12f)
+            val halfW = w * (0.18f + rng.next() * 0.13f)
+            val halfH = h * (0.012f + rng.next() * 0.012f)
+            drawWispCloud(canvas, cx, cy, halfW, halfH, wispCol,
+                alpha = (130 + sky.goldenHour * 70f).toInt().coerceIn(70, 210))
+        }
+        if (sky.goldenHour > 0.30f) {
+            val base = lerpColor(sky.midColor, 0xFFC68C6E.toInt(), 0.40f)
+            val rim = lerpColor(0xFFFFD8B0.toInt(), sky.horizonColor, 0.25f)
+            drawVolumetricCloud(canvas, sunCx + w * 0.20f, h * 0.18f,
+                w * 0.17f, h * 0.055f, base, rim, sunCx, alpha = 225)
         }
     }
 
-    private fun drawDistantMountains(canvas: Canvas, sky: SkyState, haze: Int) {
-        smoothRidgePath(path, w, h, h * 0.30f, h * 0.07f, seed = 100)
-        drawAerialLayer(canvas, path, h * 0.20f, h * 0.40f, 0xFF6C7B96.toInt(), haze, depth = 0.85f)
-    }
-
-    private fun drawMidHills(canvas: Canvas, haze: Int, params: SceneParams) {
+    private fun drawHills(canvas: Canvas, sky: SkyState, haze: Int, sunCx: Float, params: SceneParams) {
         val green = when (params.season) {
             Season.SPRING -> 0xFF5C8E54.toInt()
             Season.SUMMER -> 0xFF497E44.toInt()
             Season.AUTUMN -> 0xFF947B40.toInt()
             Season.WINTER -> 0xFF656E68.toInt()
         }
-        smoothRidgePath(path, w, h, h * 0.40f, h * 0.05f, seed = 200)
-        drawAerialLayer(canvas, path, h * 0.32f, h * 0.50f, green, haze, depth = 0.55f)
+        val layers = listOf(
+            RidgeLayer(seed = 100, baseY = h * 0.30f, amplitude = h * 0.07f,
+                color = 0xFF6C7B96.toInt(), depth = 0.85f, rim = 0.4f),
+            RidgeLayer(seed = 200, baseY = h * 0.40f, amplitude = h * 0.05f,
+                color = green, depth = 0.55f, rim = 0.6f),
+        )
+        drawRidgeStack(canvas, w, h, layers, haze, sky, sunCx)
     }
 
     private fun drawFarBank(canvas: Canvas, haze: Int, params: SceneParams) {

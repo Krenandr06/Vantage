@@ -23,6 +23,28 @@ class SceneTextureView(context: Context) : TextureView(context),
     var sceneWeather: WeatherType = WeatherType.CLEAR
     var intensity: Float = 0.5f
 
+    /**
+     * When false the Choreographer callback is detached so this view stops
+     * burning CPU. Used for off-screen pager pages so swipes stay smooth.
+     * Last-drawn frame remains visible on the surface.
+     */
+    var active: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value && surfaceReady) {
+                // Refresh the poster with current params before resuming the
+                // animation loop, so the user sees the latest state immediately.
+                drawSingleFrame()
+                startRendering()
+            } else {
+                stopRendering()
+                // Leave one final still frame on the surface so an off-screen
+                // page shows a poster instead of going black.
+                if (surfaceReady) drawSingleFrame()
+            }
+        }
+
     init {
         surfaceTextureListener = this
         isOpaque = false
@@ -41,12 +63,15 @@ class SceneTextureView(context: Context) : TextureView(context),
         scene?.init(w, h)
         weatherOverlay.init(w, h)
         surfaceReady = true
-        startRendering()
+        // Always paint a first frame so an inactive page shows a poster, not black.
+        drawSingleFrame()
+        if (active) startRendering()
     }
 
     override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, w: Int, h: Int) {
         scene?.init(w, h)
         weatherOverlay.init(w, h)
+        drawSingleFrame()
     }
 
     override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
@@ -63,35 +88,41 @@ class SceneTextureView(context: Context) : TextureView(context),
         val deltaNs = if (lastFrameNs > 0) (frameTimeNanos - lastFrameNs).coerceAtLeast(0) else 16_000_000L
         lastFrameNs = frameTimeNanos
         val deltaMs = deltaNs / 1_000_000
-        val now = System.currentTimeMillis()
 
-        val canvas: Canvas? = try { lockCanvas() } catch (_: Exception) { null }
-        if (canvas != null) {
-            try {
-                val s = scene
-                if (s != null && width > 0 && height > 0) {
-                    val params = SceneParams(
-                        width = width,
-                        height = height,
-                        timeOfDay = timeOfDay,
-                        season = sceneSeason,
-                        weather = sceneWeather,
-                        intensity = intensity,
-                        deltaMs = deltaMs,
-                        elapsedMs = now - startMs,
-                    )
-                    s.draw(canvas, params)
-                    if (sceneWeather != WeatherType.CLEAR) {
-                        weatherOverlay.draw(canvas, sceneWeather, intensity, deltaMs)
-                    }
-                }
-            } finally {
-                try { unlockCanvasAndPost(canvas) } catch (_: Exception) {}
-            }
-        }
+        renderFrame(deltaMs)
 
         if (running) {
             Choreographer.getInstance().postFrameCallback(this)
+        }
+    }
+
+    private fun drawSingleFrame() {
+        if (!surfaceReady || width <= 0 || height <= 0) return
+        renderFrame(16L)
+    }
+
+    private fun renderFrame(deltaMs: Long) {
+        val now = System.currentTimeMillis()
+        val canvas: Canvas = try { lockCanvas() } catch (_: Exception) { null } ?: return
+        try {
+            val s = scene ?: return
+            if (width <= 0 || height <= 0) return
+            val params = SceneParams(
+                width = width,
+                height = height,
+                timeOfDay = timeOfDay,
+                season = sceneSeason,
+                weather = sceneWeather,
+                intensity = intensity,
+                deltaMs = deltaMs,
+                elapsedMs = now - startMs,
+            )
+            s.draw(canvas, params)
+            if (sceneWeather != WeatherType.CLEAR) {
+                weatherOverlay.draw(canvas, sceneWeather, intensity, deltaMs)
+            }
+        } finally {
+            try { unlockCanvasAndPost(canvas) } catch (_: Exception) {}
         }
     }
 
