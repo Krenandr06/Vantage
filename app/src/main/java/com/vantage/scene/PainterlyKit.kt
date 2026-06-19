@@ -275,6 +275,198 @@ fun drawSparkles(
     kitPaint.alpha = 255
 }
 
+/** Soft conifer silhouette with rounded shoulders + subtle highlight on the lit side. */
+fun drawPaintedConifer(
+    canvas: Canvas,
+    cx: Float,
+    baseY: Float,
+    height: Float,
+    body: Int,
+    highlight: Int = lerpColor(body, 0xFFFFFFFF.toInt(), 0.20f),
+    shadow: Int = lerpColor(body, 0xFF000000.toInt(), 0.30f),
+) {
+    val halfBase = height * 0.30f
+    val tmp = Path()
+    tmp.moveTo(cx, baseY - height)
+    tmp.quadTo(cx + halfBase * 0.8f, baseY - height * 0.35f, cx + halfBase, baseY)
+    tmp.lineTo(cx - halfBase, baseY)
+    tmp.quadTo(cx - halfBase * 0.8f, baseY - height * 0.35f, cx, baseY - height)
+    tmp.close()
+    kitPaint.color = body
+    canvas.drawPath(tmp, kitPaint)
+
+    // lit side
+    val lit = Path()
+    lit.moveTo(cx, baseY - height)
+    lit.quadTo(cx + halfBase * 0.45f, baseY - height * 0.5f, cx + halfBase * 0.55f, baseY - height * 0.05f)
+    lit.lineTo(cx + halfBase * 0.05f, baseY - height * 0.05f)
+    lit.close()
+    kitPaint.color = highlight
+    kitPaint.alpha = 110
+    canvas.drawPath(lit, kitPaint)
+    kitPaint.alpha = 255
+
+    // shadow side
+    val shd = Path()
+    shd.moveTo(cx, baseY - height)
+    shd.quadTo(cx - halfBase * 0.45f, baseY - height * 0.5f, cx - halfBase * 0.55f, baseY - height * 0.05f)
+    shd.lineTo(cx - halfBase * 0.05f, baseY - height * 0.05f)
+    shd.close()
+    kitPaint.color = shadow
+    kitPaint.alpha = 90
+    canvas.drawPath(shd, kitPaint)
+    kitPaint.alpha = 255
+}
+
+/** Soft deciduous canopy — overlapping circles with a top highlight. */
+fun drawPaintedCanopy(
+    canvas: Canvas,
+    cx: Float,
+    cy: Float,
+    radius: Float,
+    body: Int,
+    highlight: Int,
+    alpha: Int = 235,
+) {
+    kitPaint.color = body
+    kitPaint.alpha = alpha
+    canvas.drawCircle(cx - radius * 0.55f, cy + radius * 0.1f, radius * 0.85f, kitPaint)
+    canvas.drawCircle(cx + radius * 0.55f, cy + radius * 0.05f, radius * 0.90f, kitPaint)
+    canvas.drawCircle(cx, cy - radius * 0.15f, radius * 1.00f, kitPaint)
+    canvas.drawCircle(cx + radius * 0.25f, cy + radius * 0.30f, radius * 0.75f, kitPaint)
+    canvas.drawCircle(cx - radius * 0.30f, cy + radius * 0.30f, radius * 0.70f, kitPaint)
+
+    kitPaint.color = highlight
+    kitPaint.alpha = (alpha * 0.55f).toInt().coerceIn(0, 255)
+    canvas.drawCircle(cx - radius * 0.25f, cy - radius * 0.30f, radius * 0.50f, kitPaint)
+    canvas.drawCircle(cx + radius * 0.05f, cy - radius * 0.45f, radius * 0.45f, kitPaint)
+    kitPaint.alpha = 255
+}
+
+/**
+ * Painterly water surface — gradient base + drifting horizontal highlights + soft sun glint column.
+ * Use for lakes, ponds, pools, river surfaces.
+ */
+fun drawPaintedWater(
+    canvas: Canvas,
+    w: Int,
+    top: Float,
+    bot: Float,
+    sky: SkyState,
+    haze: Int,
+    intensity: Float,
+    elapsedMs: Long,
+    glintCxFrac: Float = 0.5f,
+    seed: Int = 555,
+) {
+    val baseTop = lerpColor(sky.midColor, 0xFF223347.toInt(), 0.55f)
+    val baseBot = lerpColor(sky.botColor, 0xFF0c1623.toInt(), 0.55f)
+    kitPaint.shader = LinearGradient(
+        0f, top, 0f, bot,
+        baseTop, baseBot, Shader.TileMode.CLAMP,
+    )
+    canvas.drawRect(0f, top, w.toFloat(), bot, kitPaint)
+    kitPaint.shader = null
+
+    // soft reflection of the haze near the shore line
+    val refl = lerpColor(haze, 0xFFFFFFFF.toInt(), 0.25f)
+    kitPaint.shader = LinearGradient(
+        0f, top, 0f, top + (bot - top) * 0.55f,
+        intArrayOf(withAlpha(refl, 95), withAlpha(refl, 0)),
+        floatArrayOf(0f, 1f),
+        Shader.TileMode.CLAMP,
+    )
+    canvas.drawRect(0f, top, w.toFloat(), bot, kitPaint)
+    kitPaint.shader = null
+
+    // ripples
+    val rng = PRNG(seed)
+    val rippleIntensity = 0.35f + intensity * 0.65f
+    kitPaint.style = Paint.Style.STROKE
+    kitPaint.strokeWidth = 1.2f
+    for (i in 0 until 18) {
+        val rx = rng.next() * w
+        val ry = top + rng.next() * (bot - top)
+        val phase = (elapsedMs / 2200.0 + rng.next() * 6.28).toFloat()
+        val rl = (12f + (Math.sin(phase.toDouble()) * 9f).toFloat()) * rippleIntensity
+        val a = ((38 + Math.sin(phase.toDouble()) * 28.0) * rippleIntensity).toInt().coerceIn(0, 255)
+        kitPaint.color = withAlpha(0xFFFFFFFF.toInt(), a)
+        canvas.drawLine(rx - rl, ry, rx + rl, ry, kitPaint)
+    }
+    kitPaint.style = Paint.Style.FILL
+    kitPaint.alpha = 255
+
+    // sun-glint column
+    if (sky.sunY in 0f..1f && sky.sunSize > 0f) {
+        val cx = w * glintCxFrac
+        val glintCol = lerpColor(0xFFFFF1C8.toInt(), sky.botColor, 0.25f)
+        for (i in 0 until 14) {
+            val phase = (elapsedMs / 700.0 + i * 1.3).toFloat()
+            val flick = ((Math.sin(phase.toDouble()) * 0.5 + 0.5)).toFloat()
+            val gy = top + (i + 1) * (bot - top) / 16f + (Math.sin(phase.toDouble()) * 2f).toFloat()
+            val gw = 6f + flick * (bot - top) * 0.04f
+            kitPaint.color = withAlpha(glintCol, (40 + flick * 90).toInt().coerceIn(0, 255))
+            canvas.drawOval(cx - gw, gy - 1.5f, cx + gw, gy + 1.5f, kitPaint)
+        }
+        kitPaint.alpha = 255
+    }
+}
+
+/** Soft god-ray light shaft. */
+fun drawLightShaft(
+    canvas: Canvas,
+    cx: Float,
+    topY: Float,
+    botY: Float,
+    halfWidth: Float,
+    color: Int,
+    topAlpha: Int = 80,
+) {
+    val transparent = color and 0x00FFFFFF
+    kitPaint.shader = LinearGradient(
+        cx - halfWidth, 0f, cx + halfWidth, 0f,
+        intArrayOf(transparent, withAlpha(color, topAlpha), transparent),
+        floatArrayOf(0f, 0.5f, 1f),
+        Shader.TileMode.CLAMP,
+    )
+    val path = Path()
+    path.moveTo(cx - halfWidth * 0.4f, topY)
+    path.lineTo(cx + halfWidth * 0.4f, topY)
+    path.lineTo(cx + halfWidth, botY)
+    path.lineTo(cx - halfWidth, botY)
+    path.close()
+    canvas.drawPath(path, kitPaint)
+    kitPaint.shader = null
+    kitPaint.alpha = 255
+}
+
+/** Soft volumetric fog blob — bigger and softer than the WeatherOverlay's. */
+fun drawSoftFogPuff(canvas: Canvas, cx: Float, cy: Float, rx: Float, ry: Float, color: Int, alpha: Int) {
+    kitPaint.shader = RadialGradient(
+        cx, cy, rx,
+        intArrayOf(withAlpha(color, alpha), color and 0x00FFFFFF),
+        floatArrayOf(0f, 1f),
+        Shader.TileMode.CLAMP,
+    )
+    canvas.drawOval(cx - rx, cy - ry, cx + rx, cy + ry, kitPaint)
+    kitPaint.shader = null
+    kitPaint.alpha = 255
+}
+
+/** Painterly firefly / glow particle with halo. */
+fun drawGlowParticle(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int, alpha: Int) {
+    val transparent = color and 0x00FFFFFF
+    kitPaint.shader = RadialGradient(
+        cx, cy, r * 3f,
+        withAlpha(color, (alpha * 0.5f).toInt().coerceIn(0, 255)), transparent, Shader.TileMode.CLAMP,
+    )
+    canvas.drawCircle(cx, cy, r * 3f, kitPaint)
+    kitPaint.shader = null
+    kitPaint.color = withAlpha(color, alpha)
+    canvas.drawCircle(cx, cy, r, kitPaint)
+    kitPaint.alpha = 255
+}
+
 /**
  * Draws a horizontal hazy ground line — used to bed mountain feet into atmosphere
  * so silhouettes don't look like cardboard cutouts.

@@ -11,23 +11,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vantage.data.VantagePrefs
 import com.vantage.scene.Season
-import com.vantage.scene.WeatherType
+import com.vantage.scene.currentSeason
 import com.vantage.scene.intensityLabel
-import com.vantage.ui.component.SectionHeader
-import com.vantage.ui.component.ToggleRow
+import com.vantage.scene.randomizeWeather
 import com.vantage.ui.theme.*
 
 private fun phaseLabel(t: Float): String = when {
@@ -51,11 +54,17 @@ private fun timeLabel(t: Float): String {
     return "$h12:${m.toString().padStart(2, '0')} $ampm"
 }
 
+private val PastelPeach = Color(0xFFF9E2D2)
+private val PastelLavender = Color(0xFFE5DCEC)
+private val PastelSage = Color(0xFFE2EADD)
+private val CardWash = Color(0xCCFFFEFA)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { VantagePrefs(context) }
+    val haptic = LocalHapticFeedback.current
 
     var weatherType by remember { mutableStateOf(prefs.weatherType) }
     var seasonOverride by remember { mutableStateOf(prefs.seasonOverride) }
@@ -66,8 +75,17 @@ fun SettingsScreen(onBack: () -> Unit) {
     var batteryPause by remember { mutableStateOf(prefs.pauseOnBattery) }
     var screenOffPause by remember { mutableStateOf(prefs.pauseScreenOff) }
 
+    val pageBrush = remember {
+        Brush.verticalGradient(
+            0f to PastelPeach,
+            0.30f to PastelLavender,
+            0.65f to Bone,
+            1f to PastelSage,
+        )
+    }
+
     Scaffold(
-        containerColor = Bone,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Settings", style = MaterialTheme.typography.headlineSmall) },
@@ -76,53 +94,63 @@ fun SettingsScreen(onBack: () -> Unit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Graphite)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bone),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
+        modifier = Modifier.background(pageBrush),
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // ── Scene controls ──
-            SectionHeader("Scene")
+            // ── Scene card ──
+            SoftCard {
+                CardHeader("Scene", "Mood, light, and weather of your wallpaper.")
 
-            // Weather
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                Text("Weather", style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(2.dp))
-                Text("Overlay applied to all scenes", style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
-                Spacer(Modifier.height(10.dp))
+                // Weather (with Randomize)
+                FieldHeader("Weather", "Overlay applied to all scenes")
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    listOf("clear", "rain", "snow", "fog", "cloudy").forEach { w ->
+                    listOf("clear", "rain", "snow", "fog", "cloudy").forEach { wOpt ->
                         Pill(
-                            label = w.replaceFirstChar { it.uppercase() },
-                            active = weatherType == w,
+                            label = wOpt.replaceFirstChar { it.uppercase() },
+                            active = weatherType == wOpt,
                             onClick = {
-                                weatherType = w
-                                prefs.weatherType = w
+                                weatherType = wOpt
+                                prefs.weatherType = wOpt
                             },
                             modifier = Modifier.weight(1f),
                         )
                     }
                 }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Season
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                Text("Season", style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(2.dp))
-                Text("Auto follows your calendar", style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
                 Spacer(Modifier.height(10.dp))
+                RandomizeWeatherButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.Companion.LongPress)
+                    val resolvedSeason = when (prefs.seasonOverride) {
+                        "spring" -> Season.SPRING
+                        "summer" -> Season.SUMMER
+                        "autumn" -> Season.AUTUMN
+                        "winter" -> Season.WINTER
+                        else -> currentSeason()
+                    }
+                    val picked = randomizeWeather(prefs.currentScene, resolvedSeason)
+                    weatherType = picked
+                    prefs.weatherType = picked
+                })
+
+                Spacer(Modifier.height(18.dp))
+
+                // Season
+                FieldHeader("Season", "Auto follows your calendar")
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     listOf("auto", "spring", "summer", "autumn", "winter").forEach { s ->
@@ -137,12 +165,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
                 }
-            }
 
-            Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(18.dp))
 
-            // Time of day
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                // Time of day
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -189,26 +215,19 @@ fun SettingsScreen(onBack: () -> Unit) {
                         Text(it, fontSize = 10.sp, color = GraphiteMute)
                     }
                 }
-            }
 
-            Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(18.dp))
 
-            // Motion intensity
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                // Motion intensity
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text("Motion intensity", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        intensityLabel(intensity),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Clay,
-                    )
+                    Text(intensityLabel(intensity), style = MaterialTheme.typography.bodySmall, color = Clay)
                 }
-                Spacer(Modifier.height(2.dp))
                 Text("Particle count and animation speed", style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Slider(
                     value = intensity,
                     onValueChange = {
@@ -233,61 +252,96 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), color = Hair)
+            // ── Engine card ──
+            SoftCard {
+                CardHeader("Engine", "Behavior and battery.")
 
-            // ── Engine ──
-            SectionHeader("Engine")
+                SoftToggle(
+                    label = "Use local weather",
+                    subtitle = "Match wallpaper weather to real conditions",
+                    checked = locationEnabled,
+                    onCheckedChange = {
+                        locationEnabled = it
+                        prefs.locationEnabled = it
+                    },
+                )
+                SoftToggle(
+                    label = "Weather overlay",
+                    checked = weatherEnabled,
+                    onCheckedChange = {
+                        weatherEnabled = it
+                        prefs.weatherEnabled = it
+                    },
+                )
+                SoftToggle(
+                    label = "Pause on low battery",
+                    subtitle = "Stop rendering below 15%",
+                    checked = batteryPause,
+                    onCheckedChange = {
+                        batteryPause = it
+                        prefs.pauseOnBattery = it
+                    },
+                )
+                SoftToggle(
+                    label = "Pause when screen off",
+                    checked = screenOffPause,
+                    onCheckedChange = {
+                        screenOffPause = it
+                        prefs.pauseScreenOff = it
+                    },
+                )
+            }
 
-            ToggleRow(
-                label = "Use local weather",
-                subtitle = "Match wallpaper weather to real conditions",
-                checked = locationEnabled,
-                onCheckedChange = {
-                    locationEnabled = it
-                    prefs.locationEnabled = it
-                },
-            )
-
-            ToggleRow(
-                label = "Weather overlay",
-                checked = weatherEnabled,
-                onCheckedChange = {
-                    weatherEnabled = it
-                    prefs.weatherEnabled = it
-                },
-            )
-
-            ToggleRow(
-                label = "Pause on low battery",
-                subtitle = "Stop rendering below 15%",
-                checked = batteryPause,
-                onCheckedChange = {
-                    batteryPause = it
-                    prefs.pauseOnBattery = it
-                },
-            )
-
-            ToggleRow(
-                label = "Pause when screen off",
-                checked = screenOffPause,
-                onCheckedChange = {
-                    screenOffPause = it
-                    prefs.pauseScreenOff = it
-                },
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), color = Hair)
-
-            SectionHeader("About")
-
-            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            // ── About card ──
+            SoftCard {
+                CardHeader("About", null)
                 Text("Vantage", style = MaterialTheme.typography.bodyLarge)
-                Text("Version 1.0 · Slumbering Thread Studios", style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
+                Text(
+                    "Version 1.0 · Slumbering Thread Studios",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GraphiteSoft,
+                )
             }
 
             Spacer(Modifier.height(40.dp))
         }
     }
+}
+
+@Composable
+private fun SoftCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(CardWash)
+            .border(1.dp, Hair, RoundedCornerShape(20.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun CardHeader(title: String, subtitle: String?) {
+    Text(
+        title.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = GraphiteMute,
+    )
+    if (subtitle != null) {
+        Spacer(Modifier.height(2.dp))
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun FieldHeader(title: String, subtitle: String? = null) {
+    Text(title, style = MaterialTheme.typography.bodyLarge)
+    if (subtitle != null) {
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
+    }
+    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
@@ -298,7 +352,7 @@ private fun Pill(
     modifier: Modifier = Modifier,
 ) {
     val bgColor by animateColorAsState(
-        if (active) Graphite else Color.Transparent,
+        if (active) Clay else Color.White.copy(alpha = 0.65f),
         animationSpec = tween(180),
         label = "pill_bg",
     )
@@ -310,11 +364,11 @@ private fun Pill(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(bgColor)
-            .border(1.dp, if (active) Graphite else Hair, RoundedCornerShape(6.dp))
+            .border(1.dp, if (active) Clay else Hair, RoundedCornerShape(14.dp))
             .clickable { onClick() }
-            .padding(horizontal = 6.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -324,6 +378,76 @@ private fun Pill(
             color = fgColor,
             textAlign = TextAlign.Center,
             maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun RandomizeWeatherButton(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Sage.copy(alpha = 0.22f))
+            .border(1.dp, Sage.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.Refresh,
+            contentDescription = null,
+            tint = Moss,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Randomize weather",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Graphite,
+            )
+            Text(
+                "Picks something fitting your scene and season",
+                style = MaterialTheme.typography.bodySmall,
+                color = GraphiteSoft,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SoftToggle(
+    label: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GraphiteSoft)
+            }
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                haptic.performHapticFeedback(HapticFeedbackType.Companion.LongPress)
+                onCheckedChange(it)
+            },
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Clay,
+                checkedThumbColor = Bone,
+                uncheckedTrackColor = Cream,
+                uncheckedThumbColor = GraphiteMute,
+            ),
         )
     }
 }

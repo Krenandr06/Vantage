@@ -20,20 +20,20 @@ data class SkyAnchor(
 )
 
 private val SKY_ANCHORS = listOf(
-    SkyAnchor(0f, 0xFF0a0e1a.toInt(), 0xFF161a2a.toInt(), 0xFF1c2030.toInt(), starsOp = 0.95f, moonY = 0.25f, moonSize = 28f),
-    SkyAnchor(4.5f, 0xFF101428.toInt(), 0xFF1a1e38.toInt(), 0xFF242840.toInt(), starsOp = 0.85f, moonY = 0.35f, moonSize = 26f),
-    SkyAnchor(5.8f, 0xFF2a2842.toInt(), 0xFF4a3850.toInt(), 0xFF8a5a52.toInt(), starsOp = 0.25f, sunY = 0.96f, sunSize = 54f),
-    SkyAnchor(6.5f, 0xFF5a4a6a.toInt(), 0xFF9a6a5a.toInt(), 0xFFd4916a.toInt(), starsOp = 0.05f, sunY = 0.88f, sunSize = 50f),
-    SkyAnchor(7f, 0xFF7090a8.toInt(), 0xFF90a8b8.toInt(), 0xFFc8b898.toInt(), sunY = 0.78f, sunSize = 44f),
-    SkyAnchor(8f, 0xFF88b4d0.toInt(), 0xFFa0c4d8.toInt(), 0xFFd0d4c0.toInt(), sunY = 0.62f, sunSize = 40f),
-    SkyAnchor(10f, 0xFF78b8e8.toInt(), 0xFF90c8e8.toInt(), 0xFFc8dce0.toInt(), sunY = 0.38f, sunSize = 36f),
-    SkyAnchor(12f, 0xFF68b0f0.toInt(), 0xFF88c4f0.toInt(), 0xFFb8d8e8.toInt(), sunY = 0.22f, sunSize = 34f),
-    SkyAnchor(14f, 0xFF78b8e8.toInt(), 0xFF90c8e8.toInt(), 0xFFc8dce0.toInt(), sunY = 0.30f, sunSize = 36f),
-    SkyAnchor(16f, 0xFF88b4d0.toInt(), 0xFFa0c4d8.toInt(), 0xFFd0d4c0.toInt(), sunY = 0.52f, sunSize = 40f),
-    SkyAnchor(17.5f, 0xFF9a8060.toInt(), 0xFFc89050.toInt(), 0xFFe8a040.toInt(), sunY = 0.78f, sunSize = 48f),
-    SkyAnchor(18.5f, 0xFF5a3050.toInt(), 0xFF8a4a48.toInt(), 0xFFc86838.toInt(), sunY = 0.92f, sunSize = 54f),
+    SkyAnchor(0f, 0xFF0a0e1a.toInt(), 0xFF161a2a.toInt(), 0xFF1c2030.toInt(), starsOp = 0.95f, moonY = 0.25f, moonSize = 44f),
+    SkyAnchor(4.5f, 0xFF101428.toInt(), 0xFF1a1e38.toInt(), 0xFF242840.toInt(), starsOp = 0.85f, moonY = 0.35f, moonSize = 42f),
+    SkyAnchor(5.8f, 0xFF2a2842.toInt(), 0xFF5a3e58.toInt(), 0xFFa86a5e.toInt(), starsOp = 0.25f, sunY = 0.96f, sunSize = 86f),
+    SkyAnchor(6.5f, 0xFF6a4a78.toInt(), 0xFFb47868.toInt(), 0xFFe8a878.toInt(), starsOp = 0.05f, sunY = 0.88f, sunSize = 82f),
+    SkyAnchor(7f, 0xFF7090a8.toInt(), 0xFF98b0c0.toInt(), 0xFFd4c6aa.toInt(), sunY = 0.78f, sunSize = 72f),
+    SkyAnchor(8f, 0xFF88b4d0.toInt(), 0xFFa6c8da.toInt(), 0xFFd6d8c4.toInt(), sunY = 0.62f, sunSize = 62f),
+    SkyAnchor(10f, 0xFF78b8e8.toInt(), 0xFF94caea.toInt(), 0xFFcce0e2.toInt(), sunY = 0.38f, sunSize = 56f),
+    SkyAnchor(12f, 0xFF68b0f0.toInt(), 0xFF8cc6f0.toInt(), 0xFFbcdcec.toInt(), sunY = 0.22f, sunSize = 54f),
+    SkyAnchor(14f, 0xFF78b8e8.toInt(), 0xFF94caea.toInt(), 0xFFcce0e2.toInt(), sunY = 0.30f, sunSize = 56f),
+    SkyAnchor(16f, 0xFF88b4d0.toInt(), 0xFFa6c8da.toInt(), 0xFFd6d8c4.toInt(), sunY = 0.52f, sunSize = 62f),
+    SkyAnchor(17.5f, 0xFFa28060.toInt(), 0xFFd49050.toInt(), 0xFFf2a648.toInt(), sunY = 0.78f, sunSize = 76f),
+    SkyAnchor(18.5f, 0xFF5a3050.toInt(), 0xFF923a4a.toInt(), 0xFFd47038.toInt(), sunY = 0.92f, sunSize = 86f),
     SkyAnchor(19.5f, 0xFF2a1838.toInt(), 0xFF3a2848.toInt(), 0xFF5a3850.toInt(), starsOp = 0.15f),
-    SkyAnchor(21f, 0xFF0a0e1a.toInt(), 0xFF161a2a.toInt(), 0xFF1c2030.toInt(), starsOp = 0.9f, moonY = 0.40f, moonSize = 26f),
+    SkyAnchor(21f, 0xFF0a0e1a.toInt(), 0xFF161a2a.toInt(), 0xFF1c2030.toInt(), starsOp = 0.9f, moonY = 0.40f, moonSize = 42f),
 )
 
 data class SkyState(
@@ -94,11 +94,11 @@ fun drawSkyGradient(canvas: Canvas, w: Int, h: Int, sky: SkyState) {
     skyPaint.shader = null
 }
 
-fun drawSun(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.5f) {
+fun drawSun(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.5f, sizeScale: Float = 1f) {
     if (sky.sunY < 0f || sky.sunSize <= 0f) return
     val cx = w * cxFrac
     val cy = h * sky.sunY
-    val r = sky.sunSize
+    val r = sky.sunSize * sizeScale
     val warm = lerpColor(0xFFFFE5B0.toInt(), sky.botColor, 0.25f)
     drawSoftGlow(canvas, cx, cy, r, withAlpha(warm, 220), intensity = 1f)
     skyPaint.shader = RadialGradient(
@@ -112,11 +112,11 @@ fun drawSun(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.5f)
     skyPaint.alpha = 255
 }
 
-fun drawMoon(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.65f) {
+fun drawMoon(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.65f, sizeScale: Float = 1f) {
     if (sky.moonY < 0f || sky.moonSize <= 0f) return
     val cx = w * cxFrac
     val cy = h * sky.moonY
-    val r = sky.moonSize
+    val r = sky.moonSize * sizeScale
     drawSoftGlow(canvas, cx, cy, r, withAlpha(0xFFD8DCEC.toInt(), 180), intensity = 0.8f)
     skyPaint.shader = RadialGradient(
         cx, cy, r,

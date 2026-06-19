@@ -4,19 +4,12 @@ import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.Shader
 
 class SpaceScene : VantageScene {
 
-    private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val nebulaPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val auroraPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val planetPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val cometPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val craterPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
     private var w = 0
     private var h = 0
@@ -26,6 +19,7 @@ class SpaceScene : VantageScene {
 
     override fun draw(canvas: Canvas, params: SceneParams) {
         drawBackground(canvas)
+        drawDistantStar(canvas, params)
         drawStarField(canvas, params)
         drawNebula(canvas, params)
         drawAurora(canvas, params)
@@ -35,77 +29,135 @@ class SpaceScene : VantageScene {
         drawRings(canvas, params)
         drawAtmosphereHalo(canvas)
         drawCraterRim(canvas)
+        drawVignette(canvas, w, h, withAlpha(0xFF000000.toInt(), 140), strength = 0.7f)
     }
 
     private fun drawBackground(canvas: Canvas) {
-        bgPaint.shader = LinearGradient(
+        paint.shader = LinearGradient(
             0f, 0f, 0f, h.toFloat(),
-            intArrayOf(0xFF08081A.toInt(), 0xFF0A0E1E.toInt(), 0xFF101828.toInt()),
-            floatArrayOf(0f, 0.5f, 1f),
+            intArrayOf(0xFF06081A.toInt(), 0xFF0A1226.toInt(), 0xFF101A30.toInt(), 0xFF1A2440.toInt()),
+            floatArrayOf(0f, 0.4f, 0.75f, 1f),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), bgPaint)
-        bgPaint.shader = null
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.shader = null
+
+        // soft horizon glow behind the planet
+        val glow = 0xFF3A5A8C.toInt()
+        paint.shader = RadialGradient(
+            w * 0.5f, h * 0.55f, w * 0.6f,
+            withAlpha(glow, 80), withAlpha(glow, 0), Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.shader = null
+    }
+
+    /** A large distant star that anchors the composition — much bigger than other scenes' sun. */
+    private fun drawDistantStar(canvas: Canvas, params: SceneParams) {
+        val cx = w * 0.78f
+        val cy = h * 0.18f
+        val r = w * 0.06f
+        // outer halo
+        paint.shader = RadialGradient(
+            cx, cy, r * 4f,
+            withAlpha(0xFFFFE8B0.toInt(), 50), withAlpha(0xFFFFE8B0.toInt(), 0),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, r * 4f, paint)
+        // mid halo
+        paint.shader = RadialGradient(
+            cx, cy, r * 2f,
+            withAlpha(0xFFFFEBB8.toInt(), 140), withAlpha(0xFFFFEBB8.toInt(), 0),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, r * 2f, paint)
+        // body
+        paint.shader = RadialGradient(
+            cx, cy, r,
+            intArrayOf(0xFFFFFAE2.toInt(), 0xFFFFE3A0.toInt()),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, r, paint)
+        paint.shader = null
+
+        // a couple of slow flares
+        paint.color = withAlpha(0xFFFFE8B0.toInt(), 120)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.5f
+        val rot = (params.elapsedMs / 40000.0).toFloat()
+        for (i in 0 until 4) {
+            val a = rot + i * (Math.PI.toFloat() / 2f)
+            val x1 = cx + Math.cos(a.toDouble()).toFloat() * r * 1.2f
+            val y1 = cy + Math.sin(a.toDouble()).toFloat() * r * 1.2f
+            val x2 = cx + Math.cos(a.toDouble()).toFloat() * r * 3.2f
+            val y2 = cy + Math.sin(a.toDouble()).toFloat() * r * 3.2f
+            canvas.drawLine(x1, y1, x2, y2, paint)
+        }
+        paint.style = Paint.Style.FILL
+        paint.alpha = 255
     }
 
     private fun drawStarField(canvas: Canvas, params: SceneParams) {
-        starPaint.color = 0xFFFFFFFF.toInt()
+        paint.color = 0xFFFFFFFF.toInt()
         val rng = PRNG(10)
-        for (i in 0 until 120) {
+        for (i in 0 until 150) {
             val x = rng.next() * w
             val y = rng.next() * h
-            val size = 0.3f + rng.next() * 1.2f
+            val size = 0.3f + rng.next() * 1.4f
             val twinkle = (Math.sin((params.elapsedMs / 1200.0 + rng.next() * 20)) * 0.3 + 0.7).toFloat()
-            starPaint.alpha = (twinkle * 255).toInt().coerceIn(0, 255)
-            canvas.drawCircle(x, y, size, starPaint)
+            paint.alpha = (twinkle * 255).toInt().coerceIn(0, 255)
+            canvas.drawCircle(x, y, size, paint)
         }
-
-        // Bright stars with cross flare
-        for (i in 0 until 8) {
+        // bright stars with soft cross flare
+        for (i in 0 until 10) {
             val x = rng.next() * w
             val y = rng.next() * h * 0.7f
             val brightness = (Math.sin((params.elapsedMs / 2000.0 + rng.next() * 10)) * 0.4 + 0.6).toFloat()
-            starPaint.alpha = (brightness * 255).toInt().coerceIn(0, 255)
-            canvas.drawCircle(x, y, 2f, starPaint)
-            starPaint.alpha = (brightness * 80).toInt().coerceIn(0, 255)
-            starPaint.strokeWidth = 0.5f
-            starPaint.style = Paint.Style.STROKE
-            canvas.drawLine(x - 6f, y, x + 6f, y, starPaint)
-            canvas.drawLine(x, y - 6f, x, y + 6f, starPaint)
-            starPaint.style = Paint.Style.FILL
+            drawGlowParticle(canvas, x, y, 2.2f, 0xFFFFFFFF.toInt(), (brightness * 240).toInt().coerceIn(0, 255))
+            paint.color = withAlpha(0xFFFFFFFF.toInt(), (brightness * 90).toInt().coerceIn(0, 255))
+            paint.strokeWidth = 0.6f
+            paint.style = Paint.Style.STROKE
+            canvas.drawLine(x - 7f, y, x + 7f, y, paint)
+            canvas.drawLine(x, y - 7f, x, y + 7f, paint)
+            paint.style = Paint.Style.FILL
         }
-        starPaint.alpha = 255
+        paint.alpha = 255
     }
 
     private fun drawNebula(canvas: Canvas, params: SceneParams) {
-        nebulaPaint.style = Paint.Style.FILL
         val rng = PRNG(20)
-        val colors = intArrayOf(0xFF3A2050.toInt(), 0xFF2A3060.toInt(), 0xFF402848.toInt(), 0xFF1A3058.toInt())
-        for (i in 0 until 6) {
-            nebulaPaint.color = colors[i % colors.size]
-            nebulaPaint.alpha = 25 + (rng.next() * 20).toInt()
+        val colors = intArrayOf(
+            0xFF6A3070.toInt(), 0xFF3A4090.toInt(), 0xFF5A2880.toInt(),
+            0xFF2A4090.toInt(), 0xFF80407A.toInt(), 0xFF40508C.toInt(),
+        )
+        for (i in 0 until 7) {
+            val color = colors[i % colors.size]
             val cx = rng.next() * w
-            val cy = rng.next() * h * 0.5f
-            val rx = 60f + rng.next() * 100f
-            val ry = 30f + rng.next() * 60f
-            val drift = (Math.sin(params.elapsedMs / 10000.0 + i) * 5).toFloat()
-            canvas.drawOval(cx - rx + drift, cy - ry, cx + rx + drift, cy + ry, nebulaPaint)
+            val cy = rng.next() * h * 0.55f
+            val rx = 80f + rng.next() * 140f
+            val ry = 40f + rng.next() * 80f
+            val drift = (Math.sin(params.elapsedMs / 10000.0 + i) * 6).toFloat()
+            paint.shader = RadialGradient(
+                cx + drift, cy, rx,
+                withAlpha(color, 55), withAlpha(color, 0),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawOval(cx - rx + drift, cy - ry, cx + rx + drift, cy + ry, paint)
+            paint.shader = null
         }
-        nebulaPaint.alpha = 255
+        paint.alpha = 255
     }
 
     private fun drawAurora(canvas: Canvas, params: SceneParams) {
-        // Aurora ribbons only visible when intensity > 0.35
         if (params.intensity <= 0.35f) return
-
-        auroraPaint.style = Paint.Style.STROKE
-        auroraPaint.strokeWidth = 3f
-        val colors = intArrayOf(0xFF30A060.toInt(), 0xFF2080A0.toInt(), 0xFF4060C0.toInt())
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4f
+        val colors = intArrayOf(0xFF40C078.toInt(), 0xFF3098B8.toInt(), 0xFF5070D8.toInt())
         for (band in 0 until 3) {
-            auroraPaint.color = colors[band]
-            auroraPaint.alpha = 35
+            paint.color = withAlpha(colors[band], 70)
             path.reset()
-            val baseY = h * 0.15f + band * h * 0.06f
+            val baseY = h * 0.12f + band * h * 0.05f
             path.moveTo(0f, baseY)
             var x = 0f
             while (x <= w) {
@@ -113,139 +165,147 @@ class SpaceScene : VantageScene {
                 path.lineTo(x, y)
                 x += 4f
             }
-            canvas.drawPath(path, auroraPaint)
+            canvas.drawPath(path, paint)
         }
-        auroraPaint.style = Paint.Style.FILL
-        auroraPaint.alpha = 255
+        paint.style = Paint.Style.FILL
+        paint.alpha = 255
     }
 
     private fun drawComet(canvas: Canvas, params: SceneParams) {
-        // Comets only visible when intensity > 0.6
         if (params.intensity <= 0.6f) return
-
         val cycle = 30000L
         val t = (params.elapsedMs % cycle).toFloat() / cycle
         if (t > 0.15f) return
-
         val progress = t / 0.15f
         val cx = w * (1f - progress * 1.3f)
         val cy = h * (0.05f + progress * 0.25f)
 
-        cometPaint.color = 0xFFFFFFFF.toInt()
-        cometPaint.alpha = ((1f - progress) * 255).toInt().coerceIn(0, 255)
-        canvas.drawCircle(cx, cy, 2f, cometPaint)
+        paint.color = withAlpha(0xFFFFFFFF.toInt(), ((1f - progress) * 255).toInt().coerceIn(0, 255))
+        canvas.drawCircle(cx, cy, 2.5f, paint)
 
-        // Trail
-        cometPaint.strokeWidth = 1.5f
-        cometPaint.style = Paint.Style.STROKE
-        cometPaint.alpha = ((1f - progress) * 120).toInt().coerceIn(0, 255)
-        canvas.drawLine(cx, cy, cx + 40f * progress + 20f, cy - 15f * progress - 8f, cometPaint)
-        cometPaint.style = Paint.Style.FILL
-        cometPaint.alpha = 255
+        paint.strokeWidth = 1.8f
+        paint.style = Paint.Style.STROKE
+        paint.alpha = ((1f - progress) * 130).toInt().coerceIn(0, 255)
+        canvas.drawLine(cx, cy, cx + 50f * progress + 22f, cy - 18f * progress - 10f, paint)
+        paint.style = Paint.Style.FILL
+        paint.alpha = 255
     }
 
     private fun drawSmallMoons(canvas: Canvas, params: SceneParams) {
-        planetPaint.color = 0xFFA0A0A8.toInt()
         val orbit1 = params.elapsedMs / 20000.0
         val mx1 = w * 0.3f + (Math.cos(orbit1) * w * 0.08f).toFloat()
         val my1 = h * 0.35f + (Math.sin(orbit1) * h * 0.03f).toFloat()
-        planetPaint.alpha = 180
-        canvas.drawCircle(mx1, my1, 6f, planetPaint)
+        paint.shader = RadialGradient(
+            mx1 - 2f, my1 - 2f, 8f,
+            intArrayOf(0xFFCCCCD4.toInt(), 0xFF60606A.toInt()),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(mx1, my1, 7f, paint)
+        paint.shader = null
 
-        planetPaint.color = 0xFF8A8A90.toInt()
         val orbit2 = params.elapsedMs / 35000.0 + 3.0
-        val mx2 = w * 0.72f + (Math.cos(orbit2) * w * 0.05f).toFloat()
-        val my2 = h * 0.3f + (Math.sin(orbit2) * h * 0.02f).toFloat()
-        planetPaint.alpha = 140
-        canvas.drawCircle(mx2, my2, 4f, planetPaint)
-        planetPaint.alpha = 255
+        val mx2 = w * 0.20f + (Math.cos(orbit2) * w * 0.05f).toFloat()
+        val my2 = h * 0.30f + (Math.sin(orbit2) * h * 0.02f).toFloat()
+        paint.shader = RadialGradient(
+            mx2 - 1f, my2 - 1f, 5f,
+            intArrayOf(0xFFB8B8C0.toInt(), 0xFF505058.toInt()),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(mx2, my2, 4.5f, paint)
+        paint.shader = null
     }
 
     private fun drawPlanet(canvas: Canvas, params: SceneParams) {
-        // Planet slowly rotates (background position drifts)
         planetDrift = (Math.sin(params.elapsedMs / 60000.0) * w * 0.02f).toFloat()
         val cx = w * 0.5f + planetDrift
-        val cy = h * 0.55f
-        val r = w * 0.22f
+        val cy = h * 0.62f
+        val r = w * 0.26f
 
-        // Planet body
-        planetPaint.color = 0xFF4A6080.toInt()
-        canvas.drawCircle(cx, cy, r, planetPaint)
+        // Body with radial shading — lit upper-right, dark lower-left.
+        paint.shader = RadialGradient(
+            cx + r * 0.35f, cy - r * 0.35f, r * 1.4f,
+            intArrayOf(0xFF82A0C8.toInt(), 0xFF42587E.toInt(), 0xFF1A2238.toInt()),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, r, paint)
+        paint.shader = null
 
-        // Cloud bands
-        val bandOffset = (params.elapsedMs / 15000f) % (r * 2)
-        val bandColors = intArrayOf(0xFF5A7090.toInt(), 0xFF3A5070.toInt(), 0xFF6A80A0.toInt(), 0xFF4A5A78.toInt())
-        for (i in 0 until 6) {
-            planetPaint.color = bandColors[i % bandColors.size]
-            planetPaint.alpha = 60
-            val bandY = cy - r + i * r * 0.35f + bandOffset * 0.1f
-            val halfW = (Math.sqrt((r * r - (bandY - cy) * (bandY - cy)).coerceAtLeast(0f).toDouble())).toFloat()
-            if (halfW > 5f) {
-                canvas.drawRect(cx - halfW, bandY - 4f, cx + halfW, bandY + 4f, planetPaint)
-            }
+        // Cloud bands clipped to planet
+        canvas.save()
+        path.reset()
+        path.addCircle(cx, cy, r, Path.Direction.CW)
+        canvas.clipPath(path)
+        val bandOffset = (params.elapsedMs / 18000f) % (r * 2)
+        val bandColors = intArrayOf(0xFF6680A8.toInt(), 0xFF3F557A.toInt(), 0xFF7090B8.toInt(), 0xFF4C6588.toInt())
+        for (i in 0 until 7) {
+            paint.color = withAlpha(bandColors[i % bandColors.size], 70)
+            val bandY = cy - r + i * r * 0.30f + bandOffset * 0.1f
+            canvas.drawRect(cx - r, bandY - 5f, cx + r, bandY + 5f, paint)
         }
+        canvas.restore()
 
-        // Terminator (day/night shadow)
-        planetPaint.color = 0xFF000020.toInt()
-        planetPaint.alpha = 100
-        canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -60f, 180f, true, planetPaint)
-        planetPaint.alpha = 255
+        // Soft terminator (night side)
+        paint.shader = RadialGradient(
+            cx - r * 0.5f, cy + r * 0.4f, r * 1.1f,
+            intArrayOf(withAlpha(0xFF000010.toInt(), 160), withAlpha(0xFF000010.toInt(), 0)),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, r, paint)
+        paint.shader = null
+        paint.alpha = 255
     }
 
     private fun drawRings(canvas: Canvas, params: SceneParams) {
         val cx = w * 0.5f + planetDrift
-        ringPaint.style = Paint.Style.STROKE
-        ringPaint.color = 0xFFA0A0B0.toInt()
-        for (i in 0 until 4) {
-            val rx = w * 0.34f + i * 8f
-            val ry = w * 0.06f + i * 2f
-            ringPaint.alpha = 60 - i * 10
-            ringPaint.strokeWidth = 3f - i * 0.5f
-            canvas.drawOval(
-                cx - rx, h * 0.55f - ry,
-                cx + rx, h * 0.55f + ry,
-                ringPaint,
-            )
+        paint.style = Paint.Style.STROKE
+        for (i in 0 until 5) {
+            paint.color = withAlpha(0xFFC0C0CC.toInt(), 80 - i * 12)
+            paint.strokeWidth = 3.5f - i * 0.5f
+            val rx = w * 0.40f + i * 9f
+            val ry = w * 0.07f + i * 2.4f
+            canvas.drawOval(cx - rx, h * 0.62f - ry, cx + rx, h * 0.62f + ry, paint)
         }
-        ringPaint.style = Paint.Style.FILL
-        ringPaint.alpha = 255
+        paint.style = Paint.Style.FILL
+        paint.alpha = 255
     }
 
     private fun drawAtmosphereHalo(canvas: Canvas) {
         val cx = w * 0.5f + planetDrift
-        haloPaint.color = 0xFF6090C0.toInt()
-        haloPaint.alpha = 20
-        haloPaint.style = Paint.Style.STROKE
-        haloPaint.strokeWidth = 8f
-        canvas.drawCircle(cx, h * 0.55f, w * 0.23f, haloPaint)
-        haloPaint.alpha = 10
-        haloPaint.strokeWidth = 16f
-        canvas.drawCircle(cx, h * 0.55f, w * 0.25f, haloPaint)
-        haloPaint.style = Paint.Style.FILL
-        haloPaint.alpha = 255
+        val cy = h * 0.62f
+        val r = w * 0.26f
+        paint.shader = RadialGradient(
+            cx, cy, r * 1.20f,
+            intArrayOf(withAlpha(0xFF6090C0.toInt(), 0), withAlpha(0xFF6090C0.toInt(), 90), withAlpha(0xFF6090C0.toInt(), 0)),
+            floatArrayOf(0.84f, 0.94f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, r * 1.20f, paint)
+        paint.shader = null
     }
 
     private fun drawCraterRim(canvas: Canvas) {
-        craterPaint.color = 0xFF2A2A30.toInt()
-        path.reset()
-        path.moveTo(0f, h * 0.88f)
-        val rng = PRNG(50)
-        var x = 0f
-        while (x <= w) {
-            path.lineTo(x, h * (0.85f + rng.next() * 0.04f))
-            x += w * 0.05f
-        }
-        path.lineTo(w.toFloat(), h.toFloat())
-        path.lineTo(0f, h.toFloat())
-        path.close()
-        canvas.drawPath(path, craterPaint)
+        val base = 0xFF1A1C26.toInt()
+        smoothRidgePath(path, w, h, h * 0.88f, h * 0.03f, seed = 50)
+        paint.shader = LinearGradient(
+            0f, h * 0.85f, 0f, h.toFloat(),
+            lerpColor(base, 0xFF40455A.toInt(), 0.20f),
+            0xFF06080C.toInt(),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawPath(path, paint)
+        paint.shader = null
 
-        // Crater details
-        craterPaint.color = 0xFF222228.toInt()
-        for (i in 0 until 4) {
+        // crater pockmarks
+        paint.color = 0xFF222230.toInt()
+        val rng = PRNG(50)
+        for (i in 0 until 5) {
             val cx = rng.next() * w
-            val cy = h * 0.9f + rng.next() * h * 0.06f
-            canvas.drawOval(cx - 12f, cy - 3f, cx + 12f, cy + 3f, craterPaint)
+            val cy = h * 0.91f + rng.next() * h * 0.05f
+            canvas.drawOval(cx - 14f, cy - 3.5f, cx + 14f, cy + 3.5f, paint)
         }
     }
 }
