@@ -3,6 +3,7 @@ package com.vantage.scene
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.graphics.Color as AColor
 
@@ -93,26 +94,39 @@ fun drawSkyGradient(canvas: Canvas, w: Int, h: Int, sky: SkyState) {
     skyPaint.shader = null
 }
 
-fun drawSun(canvas: Canvas, w: Int, h: Int, sky: SkyState) {
+fun drawSun(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.5f) {
     if (sky.sunY < 0f || sky.sunSize <= 0f) return
-    val cx = w * 0.5f
+    val cx = w * cxFrac
     val cy = h * sky.sunY
     val r = sky.sunSize
-    skyPaint.color = 0xFFFFF4D0.toInt()
-    skyPaint.alpha = 220
-    canvas.drawCircle(cx, cy, r * 1.5f, skyPaint)
-    skyPaint.alpha = 255
+    val warm = lerpColor(0xFFFFE5B0.toInt(), sky.botColor, 0.25f)
+    drawSoftGlow(canvas, cx, cy, r, withAlpha(warm, 220), intensity = 1f)
+    skyPaint.shader = RadialGradient(
+        cx, cy, r,
+        intArrayOf(0xFFFFF6DE.toInt(), withAlpha(warm, 255)),
+        floatArrayOf(0f, 1f),
+        Shader.TileMode.CLAMP,
+    )
     canvas.drawCircle(cx, cy, r, skyPaint)
+    skyPaint.shader = null
+    skyPaint.alpha = 255
 }
 
-fun drawMoon(canvas: Canvas, w: Int, h: Int, sky: SkyState) {
+fun drawMoon(canvas: Canvas, w: Int, h: Int, sky: SkyState, cxFrac: Float = 0.65f) {
     if (sky.moonY < 0f || sky.moonSize <= 0f) return
-    val cx = w * 0.65f
+    val cx = w * cxFrac
     val cy = h * sky.moonY
     val r = sky.moonSize
-    skyPaint.color = 0xFFE8E4D8.toInt()
-    skyPaint.alpha = 200
+    drawSoftGlow(canvas, cx, cy, r, withAlpha(0xFFD8DCEC.toInt(), 180), intensity = 0.8f)
+    skyPaint.shader = RadialGradient(
+        cx, cy, r,
+        intArrayOf(0xFFF2EFE2.toInt(), 0xFFB8BCC8.toInt()),
+        floatArrayOf(0f, 1f),
+        Shader.TileMode.CLAMP,
+    )
     canvas.drawCircle(cx, cy, r, skyPaint)
+    skyPaint.shader = null
+    skyPaint.alpha = 255
 }
 
 fun drawStars(canvas: Canvas, w: Int, h: Int, opacity: Float, elapsedMs: Long) {
